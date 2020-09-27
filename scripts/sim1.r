@@ -16,13 +16,14 @@ params <- expand.grid(
 	pool_size = c(3, 5, 8, 10, 15, 20, 25, 30),
 	
 	# assay characteristics
-	assay_sensitivity = c(0.05, 0.1, 0.2),
+	baseline_sensitivity = 0.98,
+	dilution_decay = c(0.05, 0.1, 0.2),
 
 	# costs
 	cost_samplingkit = 1,
 	cost_extraction = 1,
 	cost_pcr = 1,
-	replicates = c(1:100)
+	replicates = c(1:1)
 )
 
 res <- mclapply(1:nrow(params), function(i) {

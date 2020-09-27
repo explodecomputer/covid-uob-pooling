@@ -86,8 +86,6 @@ simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
 			pool_outbreak_detected = sum(pool_detected) > 2,
 			poolfollowup_outbreak_detected = sum(pool_detected * id_detected) > 2
 		)
-
-	ids$outbreak_detected
 	return(ids)
 }
 
@@ -108,7 +106,7 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_extraction, cost_p
 	tibble(
 		cost.ind_tests = nrow(ids) * cost_samplingkit + nrow(ids) * cost_extraction + nrow(ids) * cost_pcr,
 		cost.pool_tests = nrow(ids) * cost_samplingkit + npool * cost_extraction + npool * cost_pcr,
-		cost.poolfollowup_tests = cost_pool_tests + nfollowup * cost_extraction + nfollowup * cost_pcr,
+		cost.poolfollowup_tests = cost.pool_tests + nfollowup * cost_extraction + nfollowup * cost_pcr,
 
 		reagentuse.ind_tests = nrow(ids),
 		reagentuse.pool_tests = npool,
