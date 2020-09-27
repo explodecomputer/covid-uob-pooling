@@ -1,6 +1,5 @@
 ---
 title: Pooling strategies for detecting Covid in University of Bristol students
-author: Gibran Hemani
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 
