@@ -23,7 +23,7 @@ params <- expand.grid(
 	cost_samplingkit = 1,
 	cost_extraction = 1,
 	cost_pcr = 1,
-	replicates = c(1:1)
+	replicates = c(1:100)
 )
 
 res <- mclapply(1:nrow(params), function(i) {
@@ -31,4 +31,4 @@ res <- mclapply(1:nrow(params), function(i) {
 	run_simulation(ids, params[i,])
 }, mc.cores=16) %>% bind_rows()
 
-save(res, file="../data/sim1.rdata")
+save(res, file="../results/sim1.rdata")
