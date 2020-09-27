@@ -1,0 +1,231 @@
+---
+title: Pooling strategies for detecting Covid in University of Bristol students
+author: Gibran Hemani
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+```{r}
+suppressPackageStartupMessages(suppressWarnings({
+	library(dplyr)
+	library(tidyr)
+	library(ggplot2)
+	library(knitr)
+}))
+```
+
+## Background
+
+The University of Bristol UoB plans to commence the 2020 academic year with a strategy of placing students in living circles, to minimise the spread of SARS-CoV-2 across the student body. To monitor outbreaks it would be costly to simply test everybody on a regular basis, and so whether pooling samples could effectively reduce costs and still adequately detect outbreaks is an open question.
+
+These simulations seek to explore pooling strategies that aim to 
+
+- maximise sensitivity (maximise true positive detection rate)
+- maximise specificity (minimise true negative detection rate)
+- minimise cost
+- minimise reagent use
+- detect outbreaks (two or more individuals per location infected at the same time)
+
+
+## Setup
+
+### Infections in the population
+
+The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence. The number of individuals that each individual infects is possonly distributed with some value of $\lambda$ that represents the average number infected per individual. Then they transmit to some number of other students based on the following probabilities:
+
+- `high` = within circle = 0.9, within location = 0.09, anywhere else = 0.01
+- `medium` = within circle = 0.6, within location = 0.3, anywhere else = 0.1
+- `low` = within circle = 0.34, within location = 0.33, anywhere = 0.33
+
+
+### Assay sensitivity
+
+Sensitivity is assumed to be affected by pooling. The assay for detecting SARS-CoV-2 will perform worse if the dilution of the sample is greater, so a larger pool with one case will have lower sensitivity than a smaller pool with one case.
+
+Assume 98% of $TPR=0.98$ and specificity of $TNR = 1$ for a single sample (not pooled / diluted). By pooling samples, the dilution is assumed to be the proportion positive divided by the proportion in the pool. In order to simulate this appropriately we need a function that will relate sensitivity to dilution fraction. For simplicity just using a decay function
+
+$$
+TPR_{d} = TPR \times e^{-\beta (d-1)}
+$$
+
+where $d$ is the dilution factor, calculated as the total number of people in the pool divided by the number of infected people in the pool, and $\beta$ is some parameter that describes the rate of decay of the sensitivity as dilution gets higher. Three different values of $\beta$ are tried in the simulations, but ideally would get some empirical results on this (e.g. see this paper that suggests 8x dilution doesn't affect the assay https://linkinghub.elsevier.com/retrieve/pii/S1198743X20303499).
+
+```{r}
+expand.grid(
+	dilution_factor=1:30,
+	beta=c(0.05, 0.1, 0.2)
+) %>% as_tibble() %>% mutate(sensitivity = 0.98 * exp(-beta * (dilution_factor-1))) %>%
+ggplot(., aes(x=dilution_factor, y=sensitivity)) +
+geom_line(aes(colour=as.factor(beta))) +
+scale_colour_brewer() +
+theme_bw()
+```
+
+
+### Pooling
+
+To maximise the efficacy of pooling, assume that more transmission will occur within circles, and so pooling based on circles should reduce the dilution factor. For the simulations, determine a set assay pool size and allocate individuals to pools as follows.
+
+1. If the circle size is the same as the pool size, then keep as a single pool
+2. If the circle size is smaller than the pool size, use a bin packing algorithm to minimise the number of pools across all the smaller circles
+3. If a circle size is larger than the pool size, break it up to have some number of complete pools and the remainder goes into (2).
+
+Once the pools are determined, in order to report on whether circles are infected need to reassemble the circles from the pools and declare if a particular circle has any infected based on whether any of its constituent pools have been found positive.
+
+Optionally, we can follow up positive pools by individually testing everyone within that pool.
+
+### Outbreak
+
+Define outbreak as 2 people in a location being infected. This is detected either from
+
+- individual tests returning 2 people in a location
+- one location pool turning up positive
+- pool + followup tests returning 2 people in a location
+
+
+### Variables within the simulation
+
+- Baseline - test everybody
+- Larger vs smaller pools
+    + Larger pools will have the same amount of time
+    + Larger pools will cost proportionately less
+    + Larger pools will have lower sensitivity
+    + Larger pools will use less reagent
+- Detecting infected living circles vs infected individuals
+    + Detecting just living circles will have lower cost
+    + Detecting just living circles will have lower specificity (not everyone in the living circle will be infected, track and trace)
+    + Detecting just living circles will have lower reagent use
+
+
+
+## Results
+
+```{r}
+load("../results/sim1.rdata")
+```
+
+Cost difference in pooling vs pooling with followup
+
+```{r}
+ress <- res %>%
+	group_by(prevalence, spread, containment, pool_size, baseline_sensitivity, dilution_decay) %>%
+	summarise(
+		cost.ind_tests = mean(cost.ind_tests, na.rm=TRUE),
+		cost.pool_tests = mean(cost.pool_tests, na.rm=TRUE),
+		cost.poolfollowup_tests = mean(cost.poolfollowup_tests, na.rm=TRUE),
+		reagentuse.ind_tests = mean(reagentuse.ind_tests, na.rm=TRUE),
+		reagentuse.pool_tests = mean(reagentuse.pool_tests, na.rm=TRUE),
+		reagentuse.poolfollowup_tests = mean(reagentuse.poolfollowup_tests, na.rm=TRUE),
+		sensitivity.ind_tests = mean(sensitivity.ind_tests, na.rm=TRUE),
+		sensitivity.pool_tests = mean(sensitivity.pool_tests, na.rm=TRUE),
+		sensitivity.poolfollowup_tests = mean(sensitivity.poolfollowup_tests, na.rm=TRUE),
+		specificity.ind_tests = mean(specificity.ind_tests, na.rm=TRUE),
+		specificity.pool_tests = mean(specificity.pool_tests, na.rm=TRUE),
+		specificity.poolfollowup_tests = mean(specificity.poolfollowup_tests, na.rm=TRUE),
+		sensitivity.outbreak.ind_tests = mean(sensitivity.outbreak.ind_tests, na.rm=TRUE),
+		sensitivity.outbreak.pool_outbreak_detected = mean(sensitivity.outbreak.pool_outbreak_detected[is.finite(sensitivity.outbreak.pool_outbreak_detected)], na.rm=TRUE),
+		sensitivity.outbreak.poolfollowup_outbreak_detected = mean(sensitivity.outbreak.poolfollowup_outbreak_detected[is.finite(sensitivity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE),
+		specificity.outbreak.ind_tests = mean(specificity.outbreak.ind_tests[is.finite(specificity.outbreak.ind_tests)], na.rm=TRUE),
+		specificity.outbreak.pool_outbreak_detected = mean(specificity.outbreak.pool_outbreak_detected[is.finite(specificity.outbreak.pool_outbreak_detected)], na.rm=TRUE),
+		specificity.outbreak.poolfollowup_outbreak_detected = mean(specificity.outbreak.poolfollowup_outbreak_detected[is.finite(specificity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE)
+	)
+ress$group <- paste(ress$prevalence, ress$spread, ress$containment)
+```
+
+What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
+
+```{r}
+ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests) %>%
+ggplot(., aes(x=as.factor(pool_size), y=cost, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+geom_hline(aes(yintercept=cost.ind_tests)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+theme_bw()
+```
+
+Another visualisation of the same thing, showing that impact of clustering isn't very high
+
+```{r}
+ggplot(ress %>% subset(., dilution_decay==0.1), aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
+geom_point(aes(colour=containment, size=pool_size)) +
+geom_line(aes(colour=containment)) +
+geom_abline(slope=1) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+theme_bw()
+```
+
+Followup tests are relatively more expensive when the spread is higher and the 
+
+
+Sensitivity of pool vs pool+followup is basically the same, but does drop sharply with larger pool size (R0 (cols) vs baseline prevalence (rows)):
+
+```{r}
+ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
+ggplot(., aes(x=as.factor(pool_size), y=sensitivity, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+geom_hline(aes(yintercept=sensitivity.ind_tests)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+theme_bw()
+```
+
+How sensitive is this to assumptions of impact of dilution on sensitivity (R0 (cols) vs baseline prevalence (rows))
+
+```{r}
+ress %>% subset(., containment == "medium") %>%
+dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, dilution_decay) %>%
+# tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
+ggplot(., aes(x=as.factor(pool_size), y=sensitivity.poolfollowup_tests, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=as.factor(dilution_decay))) +
+geom_hline(aes(yintercept=sensitivity.ind_tests)) +
+facet_grid(prevalence ~ spread) +
+scale_fill_brewer() +
+theme_bw()
+```
+
+How many unnecessary quarantines if we quarantine whole circles when a positive pool comes back (R0 (cols) vs baseline prevalence (rows)):
+
+```{r}
+ggplot(ress %>% subset(., dilution_decay==0.1), aes(y=specificity.pool_tests, x=pool_size, group=group)) +
+geom_point(aes(colour=containment)) +
+geom_line(aes(colour=containment)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer()
+```
+
+
+## Need to know
+
+- Actual dilution effect on sensitivity
+- Costs of sample kits and tests
+
+
+## Considerations
+
+- It might be difficult to organise tests into their pools. This leads to a labour cost
+- Is the clustering enough? If there is some amount of exponential growth then the clustering could be higher. Currently doing frequency-based transmission, but density-based transmission could make it more clustered
+- There might be more efficient ways to pool. Need to maximise pools based on connectedness
+- Issue with estimating outbreaks need to check
+
+## Other thoughts
+
+If a pool is detected positive, is it possible to avoid having to test everyone in the pool to identify the infected individuals?
+
+Group testing theory - when prevalence is low then pooling can be more efficient, basically just look for positive results in a pool and then follow up everyone in the pool. To maximise the efficiency of the pooling need to have a sense of the prevalence. 
+
+This paper uses tags along with pooling:
+https://advances.sciencemag.org/content/6/37/eabc5961
+
+This is an R package for group testing:
+https://journal.r-project.org/archive/2010/RJ-2010-016/RJ-2010-016.pdf
+
+https://linkinghub.elsevier.com/retrieve/pii/S1198743X20303499
+
+https://theconversation.com/group-testing-for-coronavirus-called-pooled-testing-could-be-the-fastest-and-cheapest-way-to-increase-screening-nationwide-141579
+
+Actually the extra costs probably don't matter too much esp when prevalence low

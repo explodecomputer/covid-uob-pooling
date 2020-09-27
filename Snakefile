@@ -5,7 +5,7 @@ os.makedirs("results", exist_ok=True)
 os.makedirs("docs", exist_ok=True)
 
 rule all:
-	input: "results/sim1.rdata"
+	input: "docs/sim1.html"
 
 rule data:
 	input: "data/Living Circles Count Update.xlsx"
@@ -19,3 +19,8 @@ rule sim1:
 	shell:
 		"cd scripts; Rscript sim1.r"
 
+rule sim1_doc:
+	input: "results/sim1.rdata", "docs/sim1.Rmd"
+	output: "docs/sim1.html"
+	shell:
+		"cd docs; Rscript -e 'rmarkdown::render(\"sim1.Rmd\", output_format=\"all\")'"
