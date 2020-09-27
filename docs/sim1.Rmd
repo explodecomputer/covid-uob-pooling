@@ -29,7 +29,7 @@ These simulations seek to explore pooling strategies that aim to
 
 ### Infections in the population
 
-The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence. The number of individuals that each individual infects is possonly distributed with some value of $\lambda$ that represents the average number infected per individual. Then they transmit to some number of other students based on the following probabilities:
+The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence (0.001, 0.005, 0.01, 0.05). The number of individuals that each individual infects is possonly distributed with some value of $\lambda = \{0.5, 1, 2\}$ that represents the average number infected per infected individual. Then they transmit to some number of other students based on the following probabilities:
 
 - `high` = within circle = 0.9, within location = 0.09, anywhere else = 0.01
 - `medium` = within circle = 0.6, within location = 0.3, anywhere else = 0.1
@@ -70,7 +70,9 @@ To maximise the efficacy of pooling, assume that more transmission will occur wi
 
 Once the pools are determined, in order to report on whether circles are infected need to reassemble the circles from the pools and declare if a particular circle has any infected based on whether any of its constituent pools have been found positive.
 
-Optionally, we can follow up positive pools by individually testing everyone within that pool.
+The simulations also follow up positive pools by individually testing everyone within that pool.
+
+Currently looking at pool sizes of 3, 5, 8, 10, 15, 20, 25, 30.
 
 ### Outbreak
 

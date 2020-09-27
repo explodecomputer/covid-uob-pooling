@@ -389,7 +389,7 @@ summary {
 <h2>Setup</h2>
 <div id="infections-in-the-population" class="section level3">
 <h3>Infections in the population</h3>
-<p>The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence. The number of individuals that each individual infects is possonly distributed with some value of <span class="math inline">\(\lambda\)</span> that represents the average number infected per individual. Then they transmit to some number of other students based on the following probabilities:</p>
+<p>The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence (0.001, 0.005, 0.01, 0.05). The number of individuals that each individual infects is possonly distributed with some value of <span class="math inline">\(\lambda = \{0.5, 1, 2\}\)</span> that represents the average number infected per infected individual. Then they transmit to some number of other students based on the following probabilities:</p>
 <ul>
 <li><code>high</code> = within circle = 0.9, within location = 0.09, anywhere else = 0.01</li>
 <li><code>medium</code> = within circle = 0.6, within location = 0.3, anywhere else = 0.1</li>
@@ -423,7 +423,8 @@ theme_bw()</code></pre>
 <li>If a circle size is larger than the pool size, break it up to have some number of complete pools and the remainder goes into (2).</li>
 </ol>
 <p>Once the pools are determined, in order to report on whether circles are infected need to reassemble the circles from the pools and declare if a particular circle has any infected based on whether any of its constituent pools have been found positive.</p>
-<p>Optionally, we can follow up positive pools by individually testing everyone within that pool.</p>
+<p>The simulations also follow up positive pools by individually testing everyone within that pool.</p>
+<p>Currently looking at pool sizes of 3, 5, 8, 10, 15, 20, 25, 30.</p>
 </div>
 <div id="outbreak" class="section level3">
 <h3>Outbreak</h3>
