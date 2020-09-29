@@ -88,16 +88,16 @@ assay_sensitivity_sigmoid <- function(dilution)
 }
 
 
-simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
+simulate_testing <- function(ids)
 {
 	detected_pools <- ids %>% group_by(assay_pool) %>%
 		summarise(
 			ninfected = sum(infected), 
-			sensitivity = assay_sensitivity_decay(n()/ninfected, baseline_sensitivity, dilution_decay),
+			sensitivity = assay_sensitivity_sigmoid(n()/ninfected),
 			pool_detected = rbinom(1, 1, sensitivity),
 			.groups="drop"
 		)
-
+	baseline_sensitivity <- assay_sensitivity_sigmoid(1)
 	ids <- inner_join(ids, detected_pools, by="assay_pool")
 	ids <- ids %>% group_by(circle) %>%
 		mutate(circle_detected = any(pool_detected))
@@ -113,7 +113,7 @@ simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
 }
 
 
-summarise_simulations <- function(ids, cost_samplingkit, cost_extraction, cost_pcr)
+summarise_simulations <- function(ids, cost_samplingkit, cost_test)
 {
 	npool <- length(unique(ids$assay_pool))
 	nfollowup <- sum(ids$pool_detected)
@@ -176,10 +176,9 @@ run_simulation <- function(ids, param)
 	}
 
 	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
-	ids1 <- allocate_pools(ids, param$pool_size)
 	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
-	ids <- simulate_testing(ids, param$baseline_sensitivity, param$dilution_decay)
-	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_extraction, param$cost_pcr)
+	ids <- simulate_testing(ids)
+	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_test)
 	return(bind_cols(param, res))
 }
 
