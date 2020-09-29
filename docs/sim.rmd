@@ -70,13 +70,13 @@ Some values that fit these parameters:
 
 ```{r}
 expand.grid(
-	x = 1:30
+	dilution = 1:30
 ) %>%
 as_tibble() %>%
 mutate(
-	sensitivity = 1 / (1 + exp(-x/4+4)) * -1 + 1
+	sensitivity = 1 / (1 + exp(-dilution/4+4)) * -1 + 1
 ) %>%
-ggplot(., aes(x=x, y=sensitivity)) +
+ggplot(., aes(x=dilution, y=sensitivity)) +
 geom_line() +
 scale_colour_brewer() +
 theme_bw()
@@ -167,7 +167,7 @@ ress <- res %>%
 		efficiency.pool_tests = mean(sensitivity.pool_tests / cost.pool_tests),
 		efficiency.poolfollowup_tests = mean(sensitivity.poolfollowup_tests / cost.poolfollowup_tests)
 	)
-ress$group <- paste(ress$prevalence, ress$spread, ress$containment)
+ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
 ```
 
 What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
@@ -187,9 +187,10 @@ theme_bw()
 Another visualisation of the same thing, showing that impact of clustering isn't very high
 
 ```{r}
-ggplot(ress %>% subset(., !random_pooling), aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
-geom_point(aes(colour=containment, size=pool_size)) +
-geom_line(aes(colour=containment)) +
+
+ggplot(ress, aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
+geom_point(aes(colour=containment, size=pool_size, shape=random_pooling)) +
+geom_line(aes(colour=containment, linetype=random_pooling)) +
 geom_abline(slope=1) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
@@ -242,7 +243,6 @@ theme_bw()
 How many unnecessary quarantines if we quarantine whole circles when a positive pool comes back (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
 ggplot(ress, aes(y=specificity.pool_tests, x=pool_size, group=group)) +
 geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
