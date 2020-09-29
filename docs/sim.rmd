@@ -10,6 +10,9 @@ suppressPackageStartupMessages(suppressWarnings({
 	library(ggplot2)
 	library(knitr)
 }))
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=TRUE)
+
 ```
 
 ## Background
@@ -23,6 +26,14 @@ These simulations seek to explore pooling strategies that aim to
 - minimise cost
 - minimise reagent use
 - detect outbreaks (two or more individuals per location infected at the same time)
+
+
+Distribution of students per living circle:
+
+```{r}
+load("../data/circles.rdata")
+hist(ids$count, xlab="Number of students per circle", breaks=40, main="")
+```
 
 
 ## Setup
@@ -111,8 +122,8 @@ Define outbreak as 2 people in a location being infected. This is detected eithe
 
 ## Results
 
-```{r}
-load("../results/sim1.rdata")
+```{r, cache=FALSE}
+load("../results/sim.rdata")
 ```
 
 Use the following costs:
@@ -122,16 +133,13 @@ Use the following costs:
 
 ```{r}
 res$nstudent <- res$reagentuse.ind_tests
-res$cost.ind_tests <- (2 + 25) * res$nstudent
-res$cost.pool_tests <- 2 * res$nstudent + res$reagentuse.pool_tests * 25
-res$cost.poolfollowup_tests <- 2 * res$nstudent + res$reagentuse.poolfollowup_tests * 25
 ```
 
 Cost difference in pooling vs pooling with followup
 
 ```{r}
 ress <- res %>%
-	group_by(prevalence, spread, containment, pool_size, baseline_sensitivity, dilution_decay) %>%
+	group_by(prevalence, spread, containment, pool_size, random_pooling) %>%
 	summarise(
 		cost.ind_tests = mean(cost.ind_tests, na.rm=TRUE),
 		cost.pool_tests = mean(cost.pool_tests, na.rm=TRUE),
@@ -151,8 +159,13 @@ ress <- res %>%
 		specificity.outbreak.ind_tests = mean(specificity.outbreak.ind_tests[is.finite(specificity.outbreak.ind_tests)], na.rm=TRUE),
 		specificity.outbreak.pool_outbreak_detected = mean(specificity.outbreak.pool_outbreak_detected[is.finite(specificity.outbreak.pool_outbreak_detected)], na.rm=TRUE),
 		specificity.outbreak.poolfollowup_outbreak_detected = mean(specificity.outbreak.poolfollowup_outbreak_detected[is.finite(specificity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE),
-		true_prevalence = sum(infected)/reagentuse.ind_tests,
-		prevalence_ind_tests = sum()
+		true_prevalence=mean(true_prevalence),
+		prevalence.ind_tests = mean(prevalence.ind_tests, na.rm=TRUE),
+		prevalence.pool_tests = mean(prevalence.pool_tests, na.rm=TRUE),
+		prevalence.poolfollowup_tests = mean(prevalence.poolfollowup_tests, na.rm=TRUE),
+		efficiency.ind_tests = mean(sensitivity.ind_tests / cost.ind_tests),
+		efficiency.pool_tests = mean(sensitivity.pool_tests / cost.pool_tests),
+		efficiency.poolfollowup_tests = mean(sensitivity.poolfollowup_tests / cost.poolfollowup_tests)
 	)
 ress$group <- paste(ress$prevalence, ress$spread, ress$containment)
 ```
@@ -160,7 +173,7 @@ ress$group <- paste(ress$prevalence, ress$spread, ress$containment)
 What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
 
 ```{r}
-ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+ress %>% subset(., !random_pooling & containment == "high") %>%
 dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
 tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests) %>%
 ggplot(., aes(x=as.factor(pool_size), y=cost, group=group)) +
@@ -174,7 +187,7 @@ theme_bw()
 Another visualisation of the same thing, showing that impact of clustering isn't very high
 
 ```{r}
-ggplot(ress %>% subset(., dilution_decay==0.1), aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
+ggplot(ress %>% subset(., !random_pooling), aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
 geom_point(aes(colour=containment, size=pool_size)) +
 geom_line(aes(colour=containment)) +
 geom_abline(slope=1) +
@@ -186,7 +199,7 @@ theme_bw()
 Followup tests are relatively more expensive when the spread is higher and the prevalence is higher. Similar for reagent use:
 
 ```{r}
-ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+ress %>% subset(., !random_pooling & containment == "high") %>%
 dplyr::select(reagentuse.ind_tests, reagentuse.pool_tests, reagentuse.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
 tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests) %>%
 ggplot(., aes(x=as.factor(pool_size), y=reagentuse, group=group)) +
@@ -201,7 +214,7 @@ theme_bw()
 Sensitivity of pool vs pool+followup is basically the same, but both drop sharply with larger pool size given current dilution curves (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+ress %>% subset(., !random_pooling & containment == "high") %>%
 dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
 tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
 ggplot(., aes(x=as.factor(pool_size), y=sensitivity, group=group)) +
@@ -215,11 +228,11 @@ theme_bw()
 How sensitive is this to assumptions of impact of dilution on sensitivity (R0 (cols) vs baseline prevalence (rows))
 
 ```{r}
-ress %>% subset(., containment == "medium") %>%
-dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, dilution_decay) %>%
+ress %>% subset(., containment == "high") %>%
+dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, random_pooling) %>%
 # tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
 ggplot(., aes(x=as.factor(pool_size), y=sensitivity.poolfollowup_tests, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=as.factor(dilution_decay))) +
+geom_bar(position="dodge2", stat="identity", aes(fill=as.factor(random_pooling))) +
 geom_hline(aes(yintercept=sensitivity.ind_tests)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer() +
@@ -229,11 +242,40 @@ theme_bw()
 How many unnecessary quarantines if we quarantine whole circles when a positive pool comes back (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-ggplot(ress %>% subset(., dilution_decay==0.1), aes(y=specificity.pool_tests, x=pool_size, group=group)) +
-geom_point(aes(colour=containment)) +
-geom_line(aes(colour=containment)) +
+ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
+ggplot(ress, aes(y=specificity.pool_tests, x=pool_size, group=group)) +
+geom_point(aes(colour=containment, shape=random_pooling)) +
+geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer()
+```
+
+Estimating prevalence
+
+```{r}
+ress %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(prevalence.ind_tests, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, prevalence, spread, true_prevalence) %>%
+tidyr::gather(key="key", value="est_prevalence", prevalence.ind_tests, prevalence.pool_tests, prevalence.poolfollowup_tests) %>%
+ggplot(., aes(x=true_prevalence, y=est_prevalence, group=pool_size)) +
+geom_line(aes(colour=as.factor(pool_size))) +
+facet_wrap(~ key + prevalence, scale="free") +
+geom_abline(slope=1) +
+scale_colour_brewer() +
+theme_bw()
+```
+
+Efficiency - sensitivity vs cost ratios
+
+```{r}
+ress %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(efficiency.ind_tests, efficiency.pool_tests, efficiency.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests) %>%
+ggplot(., aes(x=as.factor(pool_size), y=efficiency, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+geom_hline(aes(yintercept=efficiency.ind_tests)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+theme_bw()
 ```
 
 
