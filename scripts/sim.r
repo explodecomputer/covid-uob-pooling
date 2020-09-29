@@ -27,4 +27,4 @@ res <- mclapply(1:nrow(params), function(i) {
 	run_simulation(ids, params[i,])
 }, mc.cores=16) %>% bind_rows()
 
-save(res, file="../results/sim1.rdata")
+save(res, file="../results/sim.rdata")
