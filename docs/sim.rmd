@@ -40,25 +40,36 @@ The simulations generate a population the size of the student body, and place th
 
 Sensitivity is assumed to be affected by pooling. The assay for detecting SARS-CoV-2 will perform worse if the dilution of the sample is greater, so a larger pool with one case will have lower sensitivity than a smaller pool with one case.
 
-Assume 98% of $TPR=0.98$ and specificity of $TNR = 1$ for a single sample (not pooled / diluted). By pooling samples, the dilution is assumed to be the proportion positive divided by the proportion in the pool. In order to simulate this appropriately we need a function that will relate sensitivity to dilution fraction. For simplicity just using a decay function
+Assume 98% of $TPR=0.98$ and specificity of $TNR = 1$ for a single sample (not pooled / diluted). By pooling samples, the dilution is assumed to be the proportion positive divided by the proportion in the pool. In order to simulate this appropriately we need a function that will relate sensitivity to dilution fraction. 
+
+Use a sigmoid function that allows
+
+- 1x dilution = 0.98 sensitivity
+- 10x dilution = 0.8 sensitivity
 
 $$
-TPR_{d} = TPR \times e^{-\beta (d-1)}
+TPR_{d} = -\frac{1}{1 + e^{-d/4 + 4}} + 1
 $$
 
-where $d$ is the dilution factor, calculated as the total number of people in the pool divided by the number of infected people in the pool, and $\beta$ is some parameter that describes the rate of decay of the sensitivity as dilution gets higher. Three different values of $\beta$ are tried in the simulations, but ideally would get some empirical results on this (e.g. see this paper that suggests 8x dilution doesn't affect the assay https://linkinghub.elsevier.com/retrieve/pii/S1198743X20303499).
+where $d$ is the dilution factor, calculated as the total number of people in the pool divided by the number of infected people in the pool. Ideally would get some empirical results on this (e.g. see this paper that suggests 8x dilution doesn't affect the assay https://linkinghub.elsevier.com/retrieve/pii/S1198743X20303499).
+
+
+Some values that fit these parameters:
+
 
 ```{r}
 expand.grid(
-	dilution_factor=1:30,
-	beta=c(0.05, 0.1, 0.2)
-) %>% as_tibble() %>% mutate(sensitivity = 0.98 * exp(-beta * (dilution_factor-1))) %>%
-ggplot(., aes(x=dilution_factor, y=sensitivity)) +
-geom_line(aes(colour=as.factor(beta))) +
+	x = 1:30
+) %>%
+as_tibble() %>%
+mutate(
+	sensitivity = 1 / (1 + exp(-x/4+4)) * -1 + 1
+) %>%
+ggplot(., aes(x=x, y=sensitivity)) +
+geom_line() +
 scale_colour_brewer() +
 theme_bw()
 ```
-
 
 ### Pooling
 
@@ -139,7 +150,9 @@ ress <- res %>%
 		sensitivity.outbreak.poolfollowup_outbreak_detected = mean(sensitivity.outbreak.poolfollowup_outbreak_detected[is.finite(sensitivity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE),
 		specificity.outbreak.ind_tests = mean(specificity.outbreak.ind_tests[is.finite(specificity.outbreak.ind_tests)], na.rm=TRUE),
 		specificity.outbreak.pool_outbreak_detected = mean(specificity.outbreak.pool_outbreak_detected[is.finite(specificity.outbreak.pool_outbreak_detected)], na.rm=TRUE),
-		specificity.outbreak.poolfollowup_outbreak_detected = mean(specificity.outbreak.poolfollowup_outbreak_detected[is.finite(specificity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE)
+		specificity.outbreak.poolfollowup_outbreak_detected = mean(specificity.outbreak.poolfollowup_outbreak_detected[is.finite(specificity.outbreak.poolfollowup_outbreak_detected)], na.rm=TRUE),
+		true_prevalence = sum(infected)/reagentuse.ind_tests,
+		prevalence_ind_tests = sum()
 	)
 ress$group <- paste(ress$prevalence, ress$spread, ress$containment)
 ```

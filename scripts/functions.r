@@ -22,19 +22,36 @@ simulate_infection <- function(ids, prevalence, spread, containment)
 	ids$infected <- ids$id %in% c(dat$id, new_infecteds)
 	ids <- ids %>%
 		group_by(location) %>%
-		mutate(location_outbreak = sum(infected >= 2))
+		mutate(location_outbreak = sum(infected >= 2)) %>%
+		ungroup()
 	return(ids)
 }
 
-allocate_pools <- function(ids, pool_size)
+allocate_pools <- function(ids, pool_size, random=FALSE)
 {
+	random_pools <- function(x, pool_size)
+	{
+		npool <- ceiling(length(x) / pool_size)
+		rep(1:npool, each=pool_size)[1:length(x)] %>% sample
+	}
+
+	if(random)
+	{
+		ids$assay_pool <- random_pools(1:nrow(ids), pool_size)
+		ids <- ids %>%
+			group_by(assay_pool) %>%
+			mutate(poolsize=n()) %>%
+			ungroup()
+		return(ids)
+	}
+
 	# First break up large circles 
 	temp1 <- subset(ids, count > pool_size) %>%
 		group_by(circle) %>%
 		mutate(
 			poolbreak = cut(1:n(), ceiling(n()/pool_size)) %>% as.numeric(),
 			pool = paste0(circle, "-", poolbreak)
-		)
+		) %>% ungroup()
 	temp2 <- subset(ids, count <= pool_size) %>%
 		mutate(
 			poolbreak = 1,
@@ -43,7 +60,7 @@ allocate_pools <- function(ids, pool_size)
 	ids <- bind_rows(temp1, temp2)
 	dat <- ids %>%
 		group_by(pool) %>%
-		summarise(poolsize=n()) %>% ungroup()
+		summarise(poolsize=n(), .groups="drop")
 	# Note that `cut` tries to make even cuts. this might not be optimal
 	# Use bin packing algorithm to assign to pools
 	dat$assay_pool <- BBmisc::binPack(dat$poolsize, pool_size)
@@ -65,6 +82,11 @@ assay_sensitivity_decay <- function(dilution, baseline, beta)
 	exp(-(dilution-1) * beta) * baseline
 }
 
+assay_sensitivity_sigmoid <- function(dilution)
+{
+	1 / (1 + exp(-dilution/4+4)) * -1 + 1
+}
+
 
 simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
 {
@@ -72,7 +94,8 @@ simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
 		summarise(
 			ninfected = sum(infected), 
 			sensitivity = assay_sensitivity_decay(n()/ninfected, baseline_sensitivity, dilution_decay),
-			pool_detected = rbinom(1, 1, sensitivity)
+			pool_detected = rbinom(1, 1, sensitivity),
+			.groups="drop"
 		)
 
 	ids <- inner_join(ids, detected_pools, by="assay_pool")
@@ -85,7 +108,7 @@ simulate_testing <- function(ids, baseline_sensitivity, dilution_decay)
 			ind_outbreak_detected = sum(id_detected) > 2,
 			pool_outbreak_detected = sum(pool_detected) > 2,
 			poolfollowup_outbreak_detected = sum(pool_detected * id_detected) > 2
-		)
+		) %>% ungroup()
 	return(ids)
 }
 
@@ -100,13 +123,20 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_extraction, cost_p
 			outbreak = any(location_outbreak), 
 			ind_outbreak_detected = any(ind_outbreak_detected),
 			pool_outbreak_detected = any(pool_outbreak_detected),
-			poolfollowup_outbreak_detected = any(poolfollowup_outbreak_detected)
+			poolfollowup_outbreak_detected = any(poolfollowup_outbreak_detected),
+			.groups="drop"
 		)
 
 	tibble(
-		cost.ind_tests = nrow(ids) * cost_samplingkit + nrow(ids) * cost_extraction + nrow(ids) * cost_pcr,
-		cost.pool_tests = nrow(ids) * cost_samplingkit + npool * cost_extraction + npool * cost_pcr,
-		cost.poolfollowup_tests = cost.pool_tests + nfollowup * cost_extraction + nfollowup * cost_pcr,
+		nstudents = nrow(ids),
+		true_prevalence = sum(ids$infected) / nrow(ids),
+		prevalence.ind_tests = sum(ids$id_detected) / nstudents,
+		prevalence.pool_tests = sum(ids$pool_detected) / nstudents,
+		prevalence.poolfollowup_tests = sum(ids$pool_detected & ids$id_detected) / nstudents,
+
+		cost.ind_tests = nrow(ids) * cost_samplingkit + nrow(ids) * cost_test,
+		cost.pool_tests = nrow(ids) * cost_samplingkit + npool * cost_test,
+		cost.poolfollowup_tests = cost.pool_tests + nfollowup * cost_test,
 
 		reagentuse.ind_tests = nrow(ids),
 		reagentuse.pool_tests = npool,
@@ -146,8 +176,12 @@ run_simulation <- function(ids, param)
 	}
 
 	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
-	ids <- allocate_pools(ids, param$pool_size)
+	ids1 <- allocate_pools(ids, param$pool_size)
+	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
 	ids <- simulate_testing(ids, param$baseline_sensitivity, param$dilution_decay)
 	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_extraction, param$cost_pcr)
 	return(bind_cols(param, res))
 }
+
+
+
