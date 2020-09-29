@@ -104,6 +104,18 @@ Define outbreak as 2 people in a location being infected. This is detected eithe
 load("../results/sim1.rdata")
 ```
 
+Use the following costs:
+
+- £2 per individual for sample collection
+- £25 per PCR test (£12 consumables + £13 labour)
+
+```{r}
+res$nstudent <- res$reagentuse.ind_tests
+res$cost.ind_tests <- (2 + 25) * res$nstudent
+res$cost.pool_tests <- 2 * res$nstudent + res$reagentuse.pool_tests * 25
+res$cost.poolfollowup_tests <- 2 * res$nstudent + res$reagentuse.poolfollowup_tests * 25
+```
+
 Cost difference in pooling vs pooling with followup
 
 ```{r}
@@ -203,8 +215,6 @@ scale_colour_brewer()
 ## Need to know
 
 - Actual dilution effect on sensitivity
-- Costs of sample kits and tests
-
 
 ## Considerations
 
