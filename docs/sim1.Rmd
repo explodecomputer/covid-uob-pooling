@@ -170,10 +170,22 @@ scale_colour_brewer() +
 theme_bw()
 ```
 
-Followup tests are relatively more expensive when the spread is higher and the 
+Followup tests are relatively more expensive when the spread is higher and the prevalence is higher. Similar for reagent use:
+
+```{r}
+ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
+dplyr::select(reagentuse.ind_tests, reagentuse.pool_tests, reagentuse.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests) %>%
+ggplot(., aes(x=as.factor(pool_size), y=reagentuse, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+geom_hline(aes(yintercept=reagentuse.ind_tests)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+theme_bw()
+```
 
 
-Sensitivity of pool vs pool+followup is basically the same, but does drop sharply with larger pool size (R0 (cols) vs baseline prevalence (rows)):
+Sensitivity of pool vs pool+followup is basically the same, but both drop sharply with larger pool size given current dilution curves (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
 ress %>% subset(., dilution_decay==0.1 & containment == "medium") %>%
