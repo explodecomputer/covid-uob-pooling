@@ -1,6 +1,24 @@
 library(tidyverse)
 library(BBmisc)
 
+simulate_viralload <- function(ids,f0,f1,f2,g0,g1,g2) {
+  # lognormal distribution of viral load over time
+  x <- seq(0.01, f0, by=0.01)
+  y <- dnorm(log(x), mean=f1, sd=f2)
+  a <- trapz(x,y)
+  
+  # scale maximum viral load
+  l <- rbeta(nrow(ids),g0,g1)*g2
+  ids$cvl <- a * (10^l)
+  
+  # sample each individual at a random time
+  ts <- sample(1:length(x),nrow(ids),replace=TRUE)
+  # ids$day <- x[ts]
+  ids$vl <- y[ts] * (10^l)
+  
+  return(ids)
+}
+
 simulate_infection <- function(ids, prevalence, spread, containment)
 {
 	# Sample initial individuals
@@ -24,6 +42,11 @@ simulate_infection <- function(ids, prevalence, spread, containment)
 		group_by(location) %>%
 		mutate(location_outbreak = sum(infected >= 2)) %>%
 		ungroup()
+	
+	# remove vl for anyone not infected
+	ids$vl[ids$infected==FALSE] <- 0
+	# ids$cvl[ids$infected==FALSE] <- 0
+	
 	return(ids)
 }
 
@@ -178,7 +201,8 @@ run_simulation <- function(ids, param)
 	} else {
 		stop("containment value")
 	}
-
+  
+  ids <- simulate_viralload(ids,param$f0,param$f1,param$f2,param$g0,param$g1,param$g2) ## 
 	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
 	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
 	ids <- simulate_testing(ids)

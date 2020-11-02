@@ -22,6 +22,13 @@ params <- expand.grid(
 	replicates = c(1:100)
 )
 
+params$f0 <- 14 # number of days of viral load
+params$f1 <- 0 # mean of lognormal for viral load distribution
+params$f2 <- 0.8 # sd of lognormal for viral load distribution
+params$g0 <- 0.3 # beta shape 1
+params$g1 <- 1 # beta shape 2
+params$g2 <- 3 # multiplier for beta distribution
+
 res <- mclapply(1:nrow(params), function(i) {
 	message(i, " of ", nrow(params))
 	run_simulation(ids, params[i,])
