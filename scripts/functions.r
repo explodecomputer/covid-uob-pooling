@@ -87,6 +87,10 @@ assay_sensitivity_sigmoid <- function(dilution)
 	1 / (1 + exp(-dilution/4+4)) * -1 + 1
 }
 
+assay_ppv <- function(sensitivity, prevalence, specificity)
+{
+	sensitivity * prevalence / (sensitivity * prevalence + (1-specificity) * (1-prevalence))
+}
 
 simulate_testing <- function(ids)
 {

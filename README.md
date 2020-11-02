@@ -13,3 +13,16 @@ snakemake
 The simulations take about 1 hour on 16 cores.
 
 
+
+---
+
+## Notes
+
+Papers on pooling
+
+- https://www.medrxiv.org/content/10.1101/2020.10.02.20204859v1.full.pdf
+- https://www.medrxiv.org/content/10.1101/2020.09.02.20183830v1.full.pdf
+- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3983103/
+- https://www.nejm.org/doi/full/10.1056/NEJMp2025631
+
+
