@@ -133,8 +133,8 @@ simulate_testing <- function(ids, Emin, Emax, Ea, Eb, Ct, Rct, fp)
 
 	detected_pools <- ids %>% group_by(assay_pool) %>%
 		summarise(
-			ninfected = sum(infected), 
-			pool_infected = ninfected > 0,
+			pool_ninfected = sum(infected), 
+			pool_infected = pool_ninfected > 0,
 			pool_E = mean(id_E),
 			pool_vl = sum(vl),
 			pool_Rn = pool_vl / n() * (1 + pool_E)^Ct,
@@ -186,7 +186,7 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_test)
 		reagentuse.pool_tests = npool,
 		reagentuse.poolfollowup_tests = npool + nfollowup,
 
-		sensitivity.ind_tests = sum(ids$id_detected) / sum(ids$infected),
+		sensitivity.ind_tests = sum(ids$infected & ids$id_detected) / sum(ids$infected),
 		sensitivity.pool_tests = sum(ids$pool_detected * ids$infected) / sum(ids$infected),
 		sensitivity.poolfollowup_tests = sum(ids$pool_detected * ids$infected * ids$id_detected) / sum(ids$infected),
 

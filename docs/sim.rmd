@@ -12,7 +12,6 @@ suppressPackageStartupMessages(suppressWarnings({
 }))
 
 knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=TRUE)
-
 ```
 
 ## Background
@@ -35,8 +34,12 @@ load("../data/circles.rdata")
 hist(ids$count, xlab="Number of students per circle", breaks=40, main="")
 ```
 
-
 ## Setup
+
+### Viral load in infected individuals
+
+
+
 
 ### Infections in the population
 
@@ -80,21 +83,6 @@ ggplot(., aes(x=dilution, y=sensitivity)) +
 geom_line() +
 scale_colour_brewer() +
 theme_bw()
-```
-
-
-## Positive predictive value
-
-$$
-PPV = \frac{ensitivity \times prevalence}{sensitivity \times prevalence + (1-specificity) \times (1-prevalence)}
-$$
-
-```{r}
-d <- expand.grid(sensitivity = seq(0, 1, by=0.1), prevalence=seq(0, 1, by=0.01), specificity=0.99)
-
-d$ppv = assay_ppv(d$sensitivity, d$prevalence, d$specificity)
-ggplot(d, aes(x=prevalence, y=ppv, group=as.factor(sensitivity))) +
-	geom_line(aes(colour=sensitivity))
 ```
 
 ### Pooling
