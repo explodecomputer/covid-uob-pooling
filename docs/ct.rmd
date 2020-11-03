@@ -25,6 +25,7 @@ We need to find some distributions of $R_0$ and $E$ that will result in a sensit
 Simulate some values of $E$ and $R_0$
 
 ```{r}
+set.seed(12345)
 library(scales)
 library(dplyr)
 n <- 10000
@@ -88,7 +89,7 @@ o <- optim(par = c(2, 5), fn=fn, R0=R0)
 o
 ```
 
-Now that we have parameter values for the distribution of $E$ we can look at what the dilution curve looks like
+Now that we have parameter values for the distribution of $E$ we can generate the dilution curve
 
 ```{r}
 D <- seq(1,100)

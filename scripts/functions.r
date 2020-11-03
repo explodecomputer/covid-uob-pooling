@@ -1,7 +1,16 @@
 library(tidyverse)
 library(BBmisc)
+library(caTools)
 
-simulate_viralload <- function(ids,f0,f1,f2,g0,g1,g2) {
+cumulative_viral_load <- function(f0, f1, f2)
+{
+  x <- seq(0.01, f0, by=0.01)
+  y <- dnorm(log(x), mean=f1, sd=f2)
+  a <- trapz(x,y)
+  return(a)	
+}
+
+simulate_viral_load <- function(ids, f0, f1, f2, g0, g1, g2, a) {
   # lognormal distribution of viral load over time
   x <- seq(0.01, f0, by=0.01)
   y <- dnorm(log(x), mean=f1, sd=f2)
@@ -115,20 +124,28 @@ assay_ppv <- function(sensitivity, prevalence, specificity)
 	sensitivity * prevalence / (sensitivity * prevalence + (1-specificity) * (1-prevalence))
 }
 
-simulate_testing <- function(ids)
+simulate_testing <- function(ids, Emin, Emax, Ea, Eb, Ct, Rct, fp)
 {
+	ids$id_E <- rbeta(nrow(ids), Ea, Eb) * (Emax - Emin) + Emin
+	ids$id_Rn <- ids$vl * (1 + ids$id_E)^Ct
+	ids$id_detected <- log(ids$id_Rn) > Rct
+	ids$id_detected[!ids$infected] <- rbinom(sum(!ids$infected), 1, fp)
+
 	detected_pools <- ids %>% group_by(assay_pool) %>%
 		summarise(
 			ninfected = sum(infected), 
-			sensitivity = assay_sensitivity_sigmoid(n()/ninfected),
-			pool_detected = rbinom(1, 1, sensitivity),
+			pool_infected = ninfected > 0,
+			pool_E = mean(id_E),
+			pool_vl = sum(vl),
+			pool_Rn = pool_vl / n() * (1 + pool_E)^Ct,
+			pool_detected = log(pool_Rn) > Rct,
 			.groups="drop"
 		)
+	detected_pools$pool_detected[!detected_pools$pool_infected] <- rbinom(sum(!detected_pools$pool_infected), 1, fp)
 	baseline_sensitivity <- assay_sensitivity_sigmoid(1)
 	ids <- inner_join(ids, detected_pools, by="assay_pool")
 	ids <- ids %>% group_by(circle) %>%
 		mutate(circle_detected = any(pool_detected))
-	ids$id_detected <- rbinom(nrow(ids), 1, baseline_sensitivity * ids$infected)
 	ids <- ids %>% 
 		group_by(location) %>%
 		mutate(
@@ -201,11 +218,11 @@ run_simulation <- function(ids, param)
 	} else {
 		stop("containment value")
 	}
-  
-  ids <- simulate_viralload(ids,param$f0,param$f1,param$f2,param$g0,param$g1,param$g2) ## 
+	a <- cumulative_viral_load(param$f0, param$f1, param$f2)
+	ids <- simulate_viral_load(ids, param$f0, param$f1, param$f2, param$g0, param$g1, param$g2, a)
 	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
 	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
-	ids <- simulate_testing(ids)
+	ids <- simulate_testing(ids, param$Emin, param$Emax, param$Ea, param$Eb, param$Ct, param$Rct, param$fp)
 	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_test)
 	return(bind_cols(param, res))
 }
