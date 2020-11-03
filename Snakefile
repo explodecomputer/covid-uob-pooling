@@ -14,7 +14,7 @@ rule data:
 		"cd scripts; Rscript data.r"
 
 rule sim:
-	input: "data/circles.rdata"
+	input: "data/circles.rdata", "scripts/functions.r", "scripts/sim.r"
 	output: "results/sim.rdata"
 	shell:
 		"cd scripts; Rscript sim.r"
