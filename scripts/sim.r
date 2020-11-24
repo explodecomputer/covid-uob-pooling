@@ -9,12 +9,12 @@ load("../data/efficiency_params.rdata")
 
 params <- expand.grid(
 	# infection characteristics
-	prevalence = c(0.05),
-	spread = c(3),
-	containment = c("high"),
+	prevalence = c(0.001, 0.01, 0.05),
+	spread = c(0.5, 1, 3),
+	containment = c("high", "medium", "low"),
 
 	# pooling characteristic
-	pool_size = c(10, 30),
+	pool_size = c(2, 3, 4, 5, 10, 15, 20, 25, 30),
 	random_pooling = c(TRUE, FALSE),
 
 	# costs
@@ -29,8 +29,8 @@ params$f2 <- 0.8 # sd of lognormal for viral load distribution
 params$g0 <- 0.3 # beta shape 1
 params$g1 <- 1 # beta shape 2
 params$g2 <- 3 # multiplier for beta distribution
-params$Emin <- 0.65 # Minimum PCR efficiency
-params$Emax <- 0.9 # Maximum PCR efficiency
+params$Emin <- 0.1 # Minimum PCR efficiency
+params$Emax <- 0.95 # Maximum PCR efficiency
 params$Ea <- efficiency_params$par[1] # Beta distribution a parameter for efficiency
 params$Eb <- efficiency_params$par[2] # Beta distribution b parameter for efficiency
 params$Ct <- 35 # Number cycles for detection
