@@ -135,7 +135,7 @@ simulate_testing <- function(ids, Emin, Emax, Ea, Eb, Ct, Rct, fp)
 		summarise(
 			pool_ninfected = sum(infected), 
 			pool_infected = pool_ninfected > 0,
-			pool_E = mean(id_E),
+			pool_E = min(id_E),
 			pool_vl = sum(vl),
 			pool_Rn = pool_vl / n() * (1 + pool_E)^Ct,
 			pool_detected = log(pool_Rn) > Rct,
