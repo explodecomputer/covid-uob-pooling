@@ -77,8 +77,8 @@ fn <- function(param, R0)
 	E <- rbeta(n, param[1], param[2]) * (0.9-0.65) + 0.65
 	R35_1 <- R0 * (1 + E)^35
 	R35_10 <- R0/10 * (1 + E)^35
-	q1 <- quantile(log(R35_1), 0.02)
-	q10 <- quantile(log(R35_10), 0.2)
+	q1 <- quantile(log(R35_1), 0.02, na.rm=TRUE)
+	q10 <- quantile(log(R35_10), 0.2, na.rm=TRUE)
 	return((q1 - q10)^2)
 }
 fn(c(2,5), R0)
@@ -103,5 +103,102 @@ dat <- tibble(
 	})
 )
 plot(sensitivity ~ D, dat)
+```
+
+## Using the viral load model to generate R0
+
+Generate viral loads in large sample of individuals to obtain distribution according to the overall model
+
+```{r}
+source("../scripts/functions.r")
+load("../data/circles.rdata")
+ids <- do.call(rbind, lapply(1:30, function(i) ids))
+
+sim <- expand.grid(
+	# infection characteristics
+	prevalence = c(1),
+	spread = 3,
+	containment = "high",
+
+	# pooling characteristic
+	pool_size = 2,
+	random_pooling = TRUE,
+
+	# costs
+	cost_samplingkit = 2,
+	cost_test = 25,
+	replicates = 1
+)
+sim$f0 <- 14 # number of days of viral load
+sim$f1 <- 0 # mean of lognormal for viral load distribution
+sim$f2 <- 0.8 # sd of lognormal for viral load distribution
+sim$g0 <- 0.3 # beta shape 1
+sim$g1 <- 1 # beta shape 2
+sim$g2 <- 3 # multiplier for beta distribution
+sim$Emin <- 0.1 # Minimum PCR efficiency
+sim$Emax <- 0.95 # Maximum PCR efficiency
+sim$Ct <- 35 # Number cycles for detection
+sim$fp <- 0.005 # Testing false positive rate (per test)
+
+a <- cumulative_viral_load(sim$f0, sim$f1, sim$f2)
+ids <- simulate_viral_load(ids, sim$f0, sim$f1, sim$f2, sim$g0, sim$g1, sim$g2, a)
+hist(ids$vl, breaks=100)
+hist(log(ids$vl), breaks=100)
+hist(R0, breaks=100)
+hist(log(R0), breaks=100)
+```
+
+Use the viral load as the R0 in the reaction. What test efficiency is required to obtain the calibration curves being observed.
+
+```{r}
+fn <- function(param, R0)
+{
+	n <- length(R0)
+	E <- rbeta(n, param[1], param[2]) * (sim$Emax-sim$Emin) + sim$Emin
+	R35_1 <- R0 * (1 + E)^sim$Ct
+	R35_10 <- R0/10 * (1 + E)^sim$Ct
+	q1 <- quantile(log(R35_1), 0.02, na.rm=TRUE)
+	q10 <- quantile(log(R35_10), 0.2, na.rm=TRUE)
+	return((q1 - q10)^2)
+}
+# fn(c(2,5), ids$vl)
+# fn(c(2,7), ids$vl)
+
+(efficiency_params <- optim(par = c(1, 1), fn=fn, R0=ids$vl, control=list(maxit=1000)))
+```
+
+Notes:
+
+1. Need to increase the number of rows in `ids` to overcome the sampling error in sampling E during the optimisation procedure
+2. Ideally would limit E to 0.65-0.9, but it seems like that won't fit. Relaxing that allows much smaller efficiencies which allows fit.
+3. Re-running multiple times gives consistent estimates of E parameters
+
+Plot the distribution of the efficiency
+
+```{r}
+D <- seq(1,100)
+E <- rbeta(nrow(ids), efficiency_params$par[1], efficiency_params$par[2]) * (sim$Emax-sim$Emin) + sim$Emin
+hist(E)
+
+```
+
+Plot the sensitivity change due to dilution
+
+```{r}
+Rct <- quantile(log(ids$vl * (1 + E)^sim$Ct), 0.02)
+dat <- tibble(
+	D=D, 
+	sensitivity=sapply(D, function(x) 
+	{
+		sum(log(ids$vl/x * (1 + E)^sim$Ct) > Rct)/nrow(ids)
+	})
+)
+plot(sensitivity ~ D, dat)
+```
+
+Save the parameter values for the model
+
+```{r}
+save(efficiency_params, Rct, file="../data/efficiency_params.rdata")
 ```
 

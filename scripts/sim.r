@@ -5,6 +5,7 @@ library(dplyr)
 
 source("functions.r")
 load("../data/circles.rdata")
+load("../data/efficiency_params.rdata")
 
 params <- expand.grid(
 	# infection characteristics
@@ -30,10 +31,10 @@ params$g1 <- 1 # beta shape 2
 params$g2 <- 3 # multiplier for beta distribution
 params$Emin <- 0.65 # Minimum PCR efficiency
 params$Emax <- 0.9 # Maximum PCR efficiency
-params$Ea <- 2.119930 # Beta distribution a parameter for efficiency
-params$Eb <- 1.621052 # Beta distribution b parameter for efficiency
+params$Ea <- efficiency_params$par[1] # Beta distribution a parameter for efficiency
+params$Eb <- efficiency_params$par[2] # Beta distribution b parameter for efficiency
 params$Ct <- 35 # Number cycles for detection
-params$Rct <- 19.42859 # Log Rct fluourescence detection value
+params$Rct <- Rct # Log Rct fluourescence detection value
 params$fp <- 0.005 # Testing false positive rate (per test)
 
 res <- mclapply(1:nrow(params), function(i) {

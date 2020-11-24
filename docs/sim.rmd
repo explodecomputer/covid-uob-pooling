@@ -99,6 +99,7 @@ The simulations also follow up positive pools by individually testing everyone w
 
 Currently looking at pool sizes of 3, 5, 8, 10, 15, 20, 25, 30.
 
+
 ### Outbreak
 
 Define outbreak as 2 people in a location being infected. This is detected either from
@@ -120,7 +121,6 @@ Define outbreak as 2 people in a location being infected. This is detected eithe
     + Detecting just living circles will have lower cost
     + Detecting just living circles will have lower specificity (not everyone in the living circle will be infected, track and trace)
     + Detecting just living circles will have lower reagent use
-
 
 
 ## Results
@@ -190,7 +190,6 @@ theme_bw()
 Another visualisation of the same thing, showing that impact of clustering isn't very high
 
 ```{r}
-
 ggplot(ress, aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
 geom_point(aes(colour=containment, size=pool_size, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
