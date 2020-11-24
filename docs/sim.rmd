@@ -11,7 +11,8 @@ suppressPackageStartupMessages(suppressWarnings({
 	library(knitr)
 }))
 
-knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=TRUE)
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=FALSE)
 ```
 
 ## Background

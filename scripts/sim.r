@@ -9,12 +9,12 @@ load("../data/efficiency_params.rdata")
 
 params <- expand.grid(
 	# infection characteristics
-	prevalence = c(0.001, 0.01, 0.05),
-	spread = c(0.5, 1, 3),
-	containment = c("high", "medium", "low"),
+	prevalence = c(0.05),
+	spread = c(3),
+	containment = c("high"),
 
 	# pooling characteristic
-	pool_size = c(2, 3, 4, 5, 10, 15, 20, 25, 30),
+	pool_size = c(10, 30),
 	random_pooling = c(TRUE, FALSE),
 
 	# costs
