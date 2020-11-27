@@ -99,7 +99,9 @@ $$
 A distribution of $V_{i,0}$ values can be obtained from the viral load model. Through experimental calibration we expect that the average sensitivity of the test is $T_{se}=0.98$ when $D=1$, falling to 0.8 when $D=10$ using $C_t=35$ cycles. Hence, we must identify a set of $\alpha$ and $\beta$ parameters that determine the test efficiency distribution that satisfies the calibrated test sensitivities given the assumed distribution of viral loads in the samples. To achieve this we use a general optimisation function, where we want to find an $V_{C_t}$ threshold that is estimated to be identical for the two dilution scenarios:
 
 $$
-\arg{{\min\below{\alpha,\beta}{\left(Q\left(D=1,R_0,C_t=35,\alpha,\beta,T_{se}=0.02\right)-Q\left(D=10,R_0,C_t=35,\alpha,\beta,T_{se}=0.2\right)\right)}}^2}
+\underset{\alpha, \beta}{\arg \min}
+\left ( Q \left(D=1,R_0,C_t=35,\alpha,\beta,T_{se}=0.02\right)-Q\left(D=10,R_0,C_t=35,\alpha,
+\beta,T_{se}=0.2\right) \right)^2
 $$
 
 We used the optim function in R 4.0.2 to solve this optimisation function, obtaining parameter values of $\alpha=\ 2.60$ and $\beta=1.33$.

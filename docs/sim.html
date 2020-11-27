@@ -489,7 +489,9 @@ V_{C_t}=Q\left(D,R_0,C_t,\alpha,\beta,{1-T}_{se}\right)
 \]</span></p>
 <p>A distribution of <span class="math inline">\(V_{i,0}\)</span> values can be obtained from the viral load model. Through experimental calibration we expect that the average sensitivity of the test is <span class="math inline">\(T_{se}=0.98\)</span> when <span class="math inline">\(D=1\)</span>, falling to 0.8 when <span class="math inline">\(D=10\)</span> using <span class="math inline">\(C_t=35\)</span> cycles. Hence, we must identify a set of <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span> parameters that determine the test efficiency distribution that satisfies the calibrated test sensitivities given the assumed distribution of viral loads in the samples. To achieve this we use a general optimisation function, where we want to find an <span class="math inline">\(V_{C_t}\)</span> threshold that is estimated to be identical for the two dilution scenarios:</p>
 <p><span class="math display">\[
-\arg{{\min\below{\alpha,\beta}{\left(Q\left(D=1,R_0,C_t=35,\alpha,\beta,T_{se}=0.02\right)-Q\left(D=10,R_0,C_t=35,\alpha,\beta,T_{se}=0.2\right)\right)}}^2}
+\underset{\alpha, \beta}{\arg \min}
+\left ( Q \left(D=1,R_0,C_t=35,\alpha,\beta,T_{se}=0.02\right)-Q\left(D=10,R_0,C_t=35,\alpha,
+\beta,T_{se}=0.2\right) \right)^2
 \]</span></p>
 <p>We used the optim function in R 4.0.2 to solve this optimisation function, obtaining parameter values of <span class="math inline">\(\alpha=\ 2.60\)</span> and <span class="math inline">\(\beta=1.33\)</span>.</p>
 <p>See the <a href="ct.html">ct.html</a> document (<code>ct.rmd</code>) on how this is done.</p>
