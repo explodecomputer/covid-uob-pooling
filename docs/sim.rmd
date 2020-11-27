@@ -26,7 +26,8 @@ These simulations seek to explore pooling strategies that aim to
 - minimise cost
 - minimise reagent use
 - detect outbreaks (two or more individuals per location infected at the same time)
-
+- compare against lateral flow device ([lfd.html](lfd.html))
+- estimate positive predictive value ([ppv.html](ppv.html))
 
 Distribution of students per living circle:
 
@@ -37,14 +38,33 @@ hist(ids$count, xlab="Number of students per circle", breaks=40, main="")
 
 ## Setup
 
+Our objective is to simulate the RT-PCR test for presence of SARS-Cov-2 in samples from all individuals under different disease transmission scenarios. There are four main components to the model – viral load sampling, disease transmission between students, pooling allocation of collected samples, and testing performance. We compare different aspects of testing performance across three strategies – per-individual testing, pooled testing, or pooled testing with per-individual follow-up in positive pools.
+
 ### Viral load in infected individuals
 
+We assume the viral load changes over time following a log normal curve. The viral load for each individual $V_i\left(t\right)$ over time is hence given by 
 
+$$
+V_i\left(t\right)=\frac{1}{\sigma\sqrt{2\pi}}e^{-\frac{1}{2}\left(\frac{log\left(t\right)-\mu}{\sigma}\right)^2}\times{10}^{l_i}
+$$
+
+Where t ranges from 0 to 14 days and l_i represents the per-individual scaling value of the viral load. We select the parameters \mu=0 and \sigma=0.8,  and sample the scaling value  as
+
+l_i\sim Beta\left(0.3,1\right)\times3
+
+Finally, to obtain an individual’s viral load at the time of sample collection, we sample from V_i\left(t\right) uniformly across the number of days of infection, and denote their sampled viral load as V_{i,0}.
 
 
 ### Infections in the population
 
-The simulations generate a population the size of the student body, and place them into hierarchies that represent location and living circle. Individuals are initially sampled randomly to be positive based on some baseline prevalence (0.001, 0.005, 0.01, 0.05). The number of individuals that each individual infects is possonly distributed with some value of $\lambda = \{0.5, 1, 2\}$ that represents the average number infected per infected individual. Then they transmit to some number of other students based on the following probabilities:
+At time step 0, a random set of individuals is selected to be infected according to some initial prevalence P(0). The number of people each individual goes on to infect is set as 
+
+$$
+R_i\sim Poisson\left(R\right)
+$$
+
+We allow the $R$ value to vary across simulation scenarios.
+
 
 - `high` = within circle = 0.9, within location = 0.09, anywhere else = 0.01
 - `medium` = within circle = 0.6, within location = 0.3, anywhere else = 0.1
@@ -53,14 +73,48 @@ The simulations generate a population the size of the student body, and place th
 
 ### Assay sensitivity
 
-Sensitivity is assumed to be affected by pooling. The assay for detecting SARS-CoV-2 will perform worse if the dilution of the sample is greater, so a larger pool with one case will have lower sensitivity than a smaller pool with one case.
+Based on analysis from Adam Finn and Amy Thomas
+
+- 1x dilution = 0.998 sensitivity
+- 10x dilution = 0.8 sensitivity
+
+The RT-PCR testing process involves an exponential growth phase of viral RNA, such that after a number of replication cycles n, the viral load 
+
+$$
+V_{i,n}=\frac{\sum_{D} V_{i,0}}{D}\left(1+E\right)^n
+$$
+
+where $E$ is the efficiency of the reaction, $\sum_{D} V_{i,0}$ is the starting viral load in the sample, and $D$ is the number samples in the testing pool. In the case of the individual test, $D=1$ and the $V_{i,0}$ is the viral load of the individual. We assume that the efficiency lies between 0.65 and 0.9, such as
+
+$$
+E\sim Beta\left(\alpha,\beta\right)\times\left(0.9-0.65\right)+0.65
+$$
+
+In order to test positive, the RT-PCR test must detect a viral load of some fluorescence threshold corresponding to a some number of RNA copies $V_{C_T}$ after some number of cycles $n=C_t$. We can write down the $V_{C_t}$ value given $C_t$, distribution of $V_{i,0}$ values, dilution factor $D$, parameter values for the distribution of efficiencies $E$, and the expected test sensitivity as a quantile function 
+
+$$
+V_{C_t}=Q\left(D,R_0,C_t,\alpha,\beta,{1-T}_{se}\right)
+$$
+
+A distribution of $V_{i,0}$ values can be obtained from the viral load model. Through experimental calibration we expect that the average sensitivity of the test is $T_{se}=0.98$ when $D=1$, falling to 0.8 when $D=10$ using $C_t=35$ cycles. Hence, we must identify a set of $\alpha$ and $\beta$ parameters that determine the test efficiency distribution that satisfies the calibrated test sensitivities given the assumed distribution of viral loads in the samples. To achieve this we use a general optimisation function, where we want to find an $V_{C_t}$ threshold that is estimated to be identical for the two dilution scenarios:
+
+$$
+\arg{{\min\below{\alpha,\beta}{\left(Q\left(D=1,R_0,C_t=35,\alpha,\beta,T_{se}=0.02\right)-Q\left(D=10,R_0,C_t=35,\alpha,\beta,T_{se}=0.2\right)\right)}}^2}
+$$
+
+We used the optim function in R 4.0.2 to solve this optimisation function, obtaining parameter values of $\alpha=\ 2.60$ and $\beta=1.33$.
+
+See the [ct.html](ct.html) document (`ct.rmd`) on how this is done.
+
+
+#### Previous to this
+
+Was previously not allowing any heterogeneity between Ct values using the following - now deprecated
 
 Assume 98% of $TPR=0.98$ and specificity of $TNR = 1$ for a single sample (not pooled / diluted). By pooling samples, the dilution is assumed to be the proportion positive divided by the proportion in the pool. In order to simulate this appropriately we need a function that will relate sensitivity to dilution fraction. 
 
 Use a sigmoid function that allows
 
-- 1x dilution = 0.98 sensitivity
-- 10x dilution = 0.8 sensitivity
 
 $$
 TPR_{d} = -\frac{1}{1 + e^{-d/4 + 4}} + 1
@@ -69,24 +123,12 @@ $$
 where $d$ is the dilution factor, calculated as the total number of people in the pool divided by the number of infected people in the pool. Ideally would get some empirical results on this (e.g. see this paper that suggests 8x dilution doesn't affect the assay https://linkinghub.elsevier.com/retrieve/pii/S1198743X20303499).
 
 
-Some values that fit these parameters:
-
-
-```{r}
-expand.grid(
-	dilution = 1:30
-) %>%
-as_tibble() %>%
-mutate(
-	sensitivity = 1 / (1 + exp(-dilution/4+4)) * -1 + 1
-) %>%
-ggplot(., aes(x=dilution, y=sensitivity)) +
-geom_line() +
-scale_colour_brewer() +
-theme_bw()
-```
-
 ### Pooling
+
+- Random pooling
+- Pooling by living circle
+
+In the latter we use a bin packing algorithm to minimise distribution of living circles across test pools
 
 To maximise the efficacy of pooling, assume that more transmission will occur within circles, and so pooling based on circles should reduce the dilution factor. For the simulations, determine a set assay pool size and allocate individuals to pools as follows.
 
@@ -98,8 +140,6 @@ Once the pools are determined, in order to report on whether circles are infecte
 
 The simulations also follow up positive pools by individually testing everyone within that pool.
 
-Currently looking at pool sizes of 3, 5, 8, 10, 15, 20, 25, 30.
-
 
 ### Outbreak
 
@@ -109,19 +149,7 @@ Define outbreak as 2 people in a location being infected. This is detected eithe
 - one location pool turning up positive
 - pool + followup tests returning 2 people in a location
 
-
-### Variables within the simulation
-
-- Baseline - test everybody
-- Larger vs smaller pools
-    + Larger pools will have the same amount of time
-    + Larger pools will cost proportionately less
-    + Larger pools will have lower sensitivity
-    + Larger pools will use less reagent
-- Detecting infected living circles vs infected individuals
-    + Detecting just living circles will have lower cost
-    + Detecting just living circles will have lower specificity (not everyone in the living circle will be infected, track and trace)
-    + Detecting just living circles will have lower reagent use
+Note: this needs to be improved in the model
 
 
 ## Results
@@ -142,6 +170,11 @@ res$nstudent <- res$reagentuse.ind_tests
 Cost difference in pooling vs pooling with followup
 
 ```{r}
+assay_ppv <- function(sensitivity, prevalence, specificity)
+{
+	sensitivity * prevalence / (sensitivity * prevalence + (1-specificity) * (1-prevalence))
+}
+
 ress <- res %>%
 	group_by(prevalence, spread, containment, pool_size, random_pooling) %>%
 	summarise(
@@ -169,64 +202,120 @@ ress <- res %>%
 		prevalence.poolfollowup_tests = mean(prevalence.poolfollowup_tests, na.rm=TRUE),
 		efficiency.ind_tests = mean(sensitivity.ind_tests / cost.ind_tests),
 		efficiency.pool_tests = mean(sensitivity.pool_tests / cost.pool_tests),
-		efficiency.poolfollowup_tests = mean(sensitivity.poolfollowup_tests / cost.poolfollowup_tests)
+		efficiency.poolfollowup_tests = mean(sensitivity.poolfollowup_tests / cost.poolfollowup_tests),
+		ppv.ind_tests = assay_ppv(sensitivity.ind_tests, true_prevalence, specificity.ind_tests),
+		ppv.pool_tests = assay_ppv(sensitivity.pool_tests, true_prevalence, specificity.pool_tests),
+		ppv.poolfollowup_tests = assay_ppv(sensitivity.poolfollowup_tests, true_prevalence, specificity.poolfollowup_tests),
+		sensitivity.ind_lfd = 0.76,
+		specificity.ind_lfd = 0.9965,
+		reagentuse.ind_lfd = 0,
+		ppv.ind_lfd = assay_ppv(sensitivity.ind_lfd, true_prevalence, specificity.ind_lfd),
+		cost.ind_lfd = reagentuse.ind_tests * 5,
+		prevalence.ind_lfd = sensitivity.ind_lfd * true_prevalence + (1-specificity.ind_lfd),
+		efficiency.ind_lfd = mean(sensitivity.ind_tests / cost.ind_tests)
 	)
 ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
+
+temp <- group_by(ress, prevalence, spread, containment) %>%
+	summarise(
+		pool_size=1, 
+		random_pooling=FALSE,
+		cost.ind_tests = mean(cost.ind_tests, na.rm=TRUE),
+		cost.ind_lfd = mean(cost.ind_lfd, na.rm=TRUE),
+		reagentuse.ind_tests = mean(reagentuse.ind_tests, na.rm=TRUE),
+		reagentuse.ind_lfd = mean(reagentuse.ind_lfd, na.rm=TRUE),
+		sensitivity.ind_tests = mean(sensitivity.ind_tests, na.rm=TRUE),
+		sensitivity.ind_lfd = mean(sensitivity.ind_lfd, na.rm=TRUE),
+		specificity.ind_tests = mean(specificity.ind_tests, na.rm=TRUE),
+		specificity.ind_lfd = mean(specificity.ind_lfd, na.rm=TRUE),
+		prevalence.ind_tests = mean(prevalence.ind_tests, na.rm=TRUE),
+		prevalence.ind_lfd = mean(prevalence.ind_lfd, na.rm=TRUE),
+		efficiency.ind_tests = mean(efficiency.ind_tests, na.rm=TRUE),
+		efficiency.ind_lfd = mean(efficiency.ind_lfd, na.rm=TRUE),
+		ppv.ind_tests = mean(ppv.ind_tests, na.rm=TRUE),
+		ppv.ind_lfd = mean(ppv.ind_lfd, na.rm=TRUE),
+		ppv.ind_tests=mean(ppv.ind_tests),
+		true_prevalence = mean(true_prevalence, na.rm=TRUE)
+	)
+ress2 <- rbind(ress, temp)
+
+rename_labels <- function(x)
+{
+	strsplit(x, split="\\.") %>%
+	lapply(., function(y)
+	{
+		y <- y[2]
+		y[y=="ind_tests"] <- "Individual PCR"
+		y[y=="ind_lfd"] <- "Individual LFD"
+		y[y=="pool_tests"] <- "Pooled PCR"
+		y[y=="poolfollowup_tests"] <- "Pooled PCR + followup"
+		y
+	}) %>% unlist
+}
 ```
 
 What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
 
 ```{r}
-ress %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests) %>%
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, cost.ind_lfd, cost.ind_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests, cost.ind_tests, cost.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
 ggplot(., aes(x=as.factor(pool_size), y=cost, group=group)) +
 geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
-geom_hline(aes(yintercept=cost.ind_tests)) +
 facet_grid(prevalence ~ spread) +
-scale_colour_brewer() +
-theme_bw()
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+labs(x="Pool size")
 ```
 
 Another visualisation of the same thing, showing that impact of clustering isn't very high
 
 ```{r}
-ggplot(ress, aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
+ress %>% mutate(spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+ggplot(., aes(x=cost.pool_tests, y=cost.poolfollowup_tests, group=group)) +
 geom_point(aes(colour=containment, size=pool_size, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 geom_abline(slope=1) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-theme_bw()
+theme_bw() +
+theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5)) +
+labs(x="Cost of pooled PCR", y="Cost of pooled PCR with followup") 
 ```
 
 Followup tests are relatively more expensive when the spread is higher and the prevalence is higher. Similar for reagent use:
 
 ```{r}
-ress %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(reagentuse.ind_tests, reagentuse.pool_tests, reagentuse.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests) %>%
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(reagentuse.ind_tests, reagentuse.ind_lfd, reagentuse.pool_tests, reagentuse.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests, reagentuse.ind_tests, reagentuse.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
 ggplot(., aes(x=as.factor(pool_size), y=reagentuse, group=group)) +
 geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
-geom_hline(aes(yintercept=reagentuse.ind_tests)) +
 facet_grid(prevalence ~ spread) +
-scale_colour_brewer() +
-theme_bw()
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+labs(x="Pool size")
 ```
 
 
 Sensitivity of pool vs pool+followup is basically the same, but both drop sharply with larger pool size given current dilution curves (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-ress %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_lfd, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_tests, sensitivity.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
 ggplot(., aes(x=as.factor(pool_size), y=sensitivity, group=group)) +
 geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
-geom_hline(aes(yintercept=sensitivity.ind_tests)) +
 facet_grid(prevalence ~ spread) +
-scale_colour_brewer() +
-theme_bw()
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+labs(x="Pool size")
 ```
 
 How sensitive is this to assumptions of impact of dilution on sensitivity (R0 (cols) vs baseline prevalence (rows))
@@ -240,8 +329,27 @@ geom_bar(position="dodge2", stat="identity", aes(fill=as.factor(random_pooling))
 geom_hline(aes(yintercept=sensitivity.ind_tests)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer() +
-theme_bw()
+theme_bw() +
+labs(x="Pool size", y="Sensitivity of pooled PCR with followup", fill="Random pooling")
 ```
+
+Specificity
+
+```{r}
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(specificity.ind_tests, specificity.ind_lfd, specificity.pool_tests, specificity.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="specificity", specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_tests, specificity.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+ggplot(., aes(x=as.factor(pool_size), y=1-specificity, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+facet_grid(prevalence ~ spread) +
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+scale_y_log10() +
+labs(x="Pool size", y="False positive rate (log scale, lower is better)")
+```
+
 
 How many unnecessary quarantines if we quarantine whole circles when a positive pool comes back (R0 (cols) vs baseline prevalence (rows)):
 
@@ -250,48 +358,77 @@ ggplot(ress, aes(y=specificity.pool_tests, x=pool_size, group=group)) +
 geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
-scale_colour_brewer()
+scale_colour_brewer() +
+labs(x="Pool size", y="Specificity", colour="R", shape="Random pooling", linetype="Random pooling")
+```
+
+Positive predictive value
+
+```{r}
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(ppv.ind_tests, ppv.ind_lfd, ppv.pool_tests, ppv.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="ppv", ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_tests, ppv.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+ggplot(., aes(x=as.factor(pool_size), y=ppv, group=group)) +
+geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+facet_grid(prevalence ~ spread) +
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+labs(x="Pool size")
 ```
 
 Estimating prevalence
 
 ```{r}
-ress %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(prevalence.ind_tests, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, prevalence, spread, true_prevalence) %>%
-tidyr::gather(key="key", value="est_prevalence", prevalence.ind_tests, prevalence.pool_tests, prevalence.poolfollowup_tests) %>%
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(prevalence.ind_tests, prevalence.ind_lfd, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, prevalence, spread, true_prevalence) %>%
+tidyr::gather(key="key", value="est_prevalence", prevalence.pool_tests, prevalence.poolfollowup_tests, prevalence.ind_tests, prevalence.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+subset(., pool_size %in% c(1,2,5,10,20,30)) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
 ggplot(., aes(x=true_prevalence, y=est_prevalence, group=pool_size)) +
 geom_line(aes(colour=as.factor(pool_size))) +
-facet_wrap(~ key + prevalence, scale="free") +
+facet_wrap(~ key + prevalence, ncol=3, scale="free") +
 geom_abline(slope=1) +
-scale_colour_brewer() +
-theme_bw()
+scale_colour_brewer(type="qual") +
+theme_bw() +
+labs(x="True prevalence", y="Estimated prevalence", colour="Pool size")
 ```
 
 Efficiency - sensitivity vs cost ratios
 
 ```{r}
-ress %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(efficiency.ind_tests, efficiency.pool_tests, efficiency.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests) %>%
+ress2 %>% subset(., !random_pooling & containment == "high") %>%
+dplyr::select(efficiency.ind_tests, efficiency.ind_lfd, efficiency.pool_tests, efficiency.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_tests, efficiency.ind_lfd) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
 ggplot(., aes(x=as.factor(pool_size), y=efficiency, group=group)) +
 geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
-geom_hline(aes(yintercept=efficiency.ind_tests)) +
 facet_grid(prevalence ~ spread) +
-scale_colour_brewer() +
-theme_bw()
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+labs(x="Pool size", y="Sensitivity / cost")
 ```
 
 
 ## Need to know
 
-- Actual dilution effect on sensitivity
+- Actual dilution effect on sensitivity past 10x dilution - need this to validate dilution model
+
 
 ## Considerations
 
-- It might be difficult to organise tests into their pools. This leads to a labour cost
-- Is the clustering enough? If there is some amount of exponential growth then the clustering could be higher. Currently doing frequency-based transmission, but density-based transmission could make it more clustered
+- It might be difficult to organise tests into their pools. This leads to a labour cost. But, it might happen naturally in some situations
+- Is the clustering of cases in the model enough? If there is some amount of exponential growth then the clustering could be higher. Currently doing frequency-based transmission, but density-based transmission could make it more clustered
 - There might be more efficient ways to pool. Need to maximise pools based on connectedness
 - Issue with estimating outbreaks need to check
+- Is the viral load model correct? It gives weird values for the actual distribution of viral loads. We should probably aim for distribution of Ct values shown here: https://medicine.yale.edu/labmed/sections/virology/COVID-19%20Ct%20values_YNHH%20Aug.%202020%20_395430_36854_v1.pdf
+- If we could come up with a sensible distribution of Ct values (and ideally validate) then could determine sensitivity of LFD by mapping to Ct values as shown here: https://www.ox.ac.uk/sites/files/oxford/media_wysiwyg/UK%20evaluation_PHE%20Porton%20Down%20%20University%20of%20Oxford_final.pdf
+
+
+
 
 ## Other thoughts
 
