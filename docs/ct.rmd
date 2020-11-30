@@ -113,6 +113,9 @@ The above leads to unrealistic Ct distributions. Change approach - generate vira
 - 1x dilution sensitivity = 0.983
 - 10x dilution sensitivity = 0.8
 
+See https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7454307/ Figure 3 for distribution of Ct values
+
+
 ```{r}
 set.seed(12345)
 
