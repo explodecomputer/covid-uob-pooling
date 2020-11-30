@@ -105,92 +105,97 @@ dat <- tibble(
 plot(sensitivity ~ D, dat)
 ```
 
-## Using the viral load model to generate R0
 
-Generate viral loads in large sample of individuals to obtain distribution according to the overall model
+## Fitting realistic Ct values
 
-```{r}
-source("../scripts/functions.r")
-load("../data/circles.rdata")
-ids <- do.call(rbind, lapply(1:30, function(i) ids))
+The above leads to unrealistic Ct distributions. Change approach - generate viral load by simulating Ct values first. Need to find distributions of Ct and E that are reasonable, and give appropriate sensitivities at dilutions of 1x and 10x
 
-sim <- expand.grid(
-	# infection characteristics
-	prevalence = c(1),
-	spread = 3,
-	containment = "high",
-
-	# pooling characteristic
-	pool_size = 2,
-	random_pooling = TRUE,
-
-	# costs
-	cost_samplingkit = 2,
-	cost_test = 25,
-	replicates = 1
-)
-sim$f0 <- 14 # number of days of viral load
-sim$f1 <- 0 # mean of lognormal for viral load distribution
-sim$f2 <- 0.8 # sd of lognormal for viral load distribution
-sim$g0 <- 0.3 # beta shape 1
-sim$g1 <- 1 # beta shape 2
-sim$g2 <- 3 # multiplier for beta distribution
-sim$Emin <- 0.1 # Minimum PCR efficiency
-sim$Emax <- 0.95 # Maximum PCR efficiency
-sim$Ct <- 35 # Number cycles for detection
-sim$fp <- 0.005 # Testing false positive rate (per test)
-
-a <- cumulative_viral_load(sim$f0, sim$f1, sim$f2)
-ids <- simulate_viral_load(ids, sim$f0, sim$f1, sim$f2, sim$g0, sim$g1, sim$g2, a)
-hist(ids$vl, breaks=100)
-hist(log(ids$vl), breaks=100)
-hist(R0, breaks=100)
-hist(log(R0), breaks=100)
-```
-
-Use the viral load as the R0 in the reaction. What test efficiency is required to obtain the calibration curves being observed.
+- 1x dilution sensitivity = 0.983
+- 10x dilution sensitivity = 0.8
 
 ```{r}
-fn <- function(param, R0)
+set.seed(12345)
+
+n <- 500000
+rct <- 10
+ctthresh <- 35
+e_max <- 0.9
+e_min <- 0.65
+e_alpha <- 2
+e_beta <- 4
+sensitivity_1 <- 0.983
+tpr1 <- 0.983
+tpr10 <- 0.8
+
+est_rct <- function(r0, ctmax, E)
 {
-	n <- length(R0)
-	E <- rbeta(n, param[1], param[2]) * (sim$Emax-sim$Emin) + sim$Emin
-	R35_1 <- R0 * (1 + E)^sim$Ct
-	R35_10 <- R0/10 * (1 + E)^sim$Ct
-	q1 <- quantile(log(R35_1), 0.02, na.rm=TRUE)
-	q10 <- quantile(log(R35_10), 0.2, na.rm=TRUE)
-	return((q1 - q10)^2)
+	r0 * (1 + E)^ctmax
 }
-# fn(c(2,5), ids$vl)
-# fn(c(2,7), ids$vl)
 
-(efficiency_params <- optim(par = c(1, 1), fn=fn, R0=ids$vl, control=list(maxit=1000)))
+est_r0 <- function(ct, E, rct)
+{
+	rct / (1+E)^ct
+}
+
+est_ct <- function(r0, E, rct)
+{
+	log(rct/r0) / log(1+E)
+}
+
+get_ct <- function(n, uci, lci, ct_alpha=1.1, ct_beta=1.1)
+{
+	rbeta(n, ct_alpha, ct_beta) * (uci-lci) + lci
+}
+
+get_E <- function(n, uci, lci, perc=0.99)
+{
+	mu <- mean(c(uci, lci))
+	s <- (mu - lci) / qnorm(perc)
+	rnorm(100000, mu, s) %>% pmax(., 0) %>% pmin(., 1)
+}
+
+fn <- function(param, n, rct, e_max, e_min, ctthresh, tpr1=tpr1, tpr10=tpr10)
+{
+	ctd <- get_ct(n, param[1], param[2], param[3], param[4])
+	Ed <- rbeta(n, param[5], param[6]) * (e_max-e_min) + e_min
+	r0 <- est_r0(ctd, Ed, rct)
+	r0_10 <- r0 / 10
+	ctd_10 <- est_ct(r0_10, Ed, rct)
+	s1 <- sum(ctd < ctthresh)/n
+	s10 <- sum(ctd_10 < ctthresh)/n
+	return((s1 - tpr1)^2 + (s10 - tpr10)^2)
+}
+
+(efficiency_params <- optim(par = c(35, 15, 1.1, 1.1, 1, 1), fn=fn, n=n, rct=rct, e_max=e_max, e_min=e_min, ctthresh=ctthresh, tpr1=tpr1, tpr10=tpr10, control=list(maxit=1000)))
+
+ctd <- get_ct(n, efficiency_params$par[1], efficiency_params$par[2], efficiency_params$par[3], efficiency_params$par[4])
+Ed <- rbeta(n, efficiency_params$par[5], efficiency_params$par[6]) * (e_max-e_min) + e_min
+r0 <- est_r0(ctd, Ed, rct)
+r0_10 <- r0 / 10
+ctd_10 <- est_ct(r0_10, Ed, rct)
+s1 <- sum(ctd < ctthresh)/n
+s10 <- sum(ctd_10 < ctthresh)/n
+
+sum(ctd < ctthresh) / n
+sum(ctd_10 < ctthresh) / n
+
+par(mfrow=c(2,2))
+hist(ctd, main="", xlab="PCR Ct values")
+hist(Ed, main="", xlab="PCR Efficiency")
+hist(ctd_10, main="", xlab="PCR Ct values (10x dilution)")
+hist(r0, breaks=100, main="", xlab="Viral load (arbitrary units)")
 ```
 
-Notes:
-
-1. Need to increase the number of rows in `ids` to overcome the sampling error in sampling E during the optimisation procedure
-2. Ideally would limit E to 0.65-0.9, but it seems like that won't fit. Relaxing that allows much smaller efficiencies which allows fit.
-3. Re-running multiple times gives consistent estimates of E parameters
-
-Plot the distribution of the efficiency
+Change in sensitivity over dilutions
 
 ```{r}
-D <- seq(1,100)
-E <- rbeta(nrow(ids), efficiency_params$par[1], efficiency_params$par[2]) * (sim$Emax-sim$Emin) + sim$Emin
-hist(E)
-
-```
-
-Plot the sensitivity change due to dilution
-
-```{r}
-Rct <- quantile(log(ids$vl * (1 + E)^sim$Ct), 0.02)
 dat <- tibble(
-	D=D, 
+	D=seq(1,100), 
 	sensitivity=sapply(D, function(x) 
 	{
-		sum(log(ids$vl/x * (1 + E)^sim$Ct) > Rct)/nrow(ids)
+		r0_x <- r0 / x
+		ctd_x <- est_ct(r0_x, Ed, rct)
+		sum(ctd_x < ctthresh)/n
 	})
 )
 plot(sensitivity ~ D, dat)
@@ -201,4 +206,3 @@ Save the parameter values for the model
 ```{r}
 save(efficiency_params, Rct, file="../data/efficiency_params.rdata")
 ```
-

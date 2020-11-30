@@ -6,6 +6,7 @@ library(dplyr)
 source("functions.r")
 load("../data/circles.rdata")
 load("../data/efficiency_params.rdata")
+load("../data/lfd_fit.rdata")
 
 params <- expand.grid(
 	# infection characteristics
@@ -23,19 +24,22 @@ params <- expand.grid(
 	replicates = c(1:100)
 )
 
-params$f0 <- 14 # number of days of viral load
-params$f1 <- 0 # mean of lognormal for viral load distribution
-params$f2 <- 0.8 # sd of lognormal for viral load distribution
-params$g0 <- 0.3 # beta shape 1
-params$g1 <- 1 # beta shape 2
-params$g2 <- 3 # multiplier for beta distribution
-params$Emin <- 0.1 # Minimum PCR efficiency
-params$Emax <- 0.95 # Maximum PCR efficiency
-params$Ea <- efficiency_params$par[1] # Beta distribution a parameter for efficiency
-params$Eb <- efficiency_params$par[2] # Beta distribution b parameter for efficiency
-params$Ct <- 35 # Number cycles for detection
-params$Rct <- Rct # Log Rct fluourescence detection value
-params$fp <- 0.005 # Testing false positive rate (per test)
+params$ct_max <- efficiency_params$par[1] # maximum ct value
+params$ct_min <- efficiency_params$par[2] # minimum ct value
+params$ct_alpha <- efficiency_params$par[3] # Beta distribution a parameter for ct
+params$ct_beta <- efficiency_params$par[4] # Beta distribution b parameter for ct
+params$e_alpha <- efficiency_params$par[5] # Beta distribution a parameter for efficiency
+params$e_beta <- efficiency_params$par[6] # Beta distribution b parameter for efficiency
+params$e_min <- 0.65 # Minimum PCR efficiency
+params$e_max <- 0.9 # Maximum PCR efficiency
+params$ctthresh <- 35 # Number cycles for detection
+params$rct <- 10 # Log Rct fluourescence detection value - arbitrary
+params$pcr_fp <- 0.005 # Testing false positive rate (per test)
+params$lfd_Asym <- lfd_fit$coef[1,1]
+params$lfd_xmid <- lfd_fit$coef[2,1]
+params$lfd_scal <- lfd_fit$coef[3,1]
+params$lfd_fp <- 0.0032
+params$lfd_cost <- 5
 
 res <- mclapply(1:nrow(params), function(i) {
 	message(i, " of ", nrow(params))

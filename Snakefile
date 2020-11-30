@@ -13,8 +13,24 @@ rule data:
 	shell:
 		"cd scripts; Rscript data.r"
 
+rule ppv:
+	input: "docs/ppv.rmd"
+	output: "docs/ppv.html"
+
+rule ct:
+	input: "docs/ct.rmd"
+	output: "data/efficiency_params.rdata", "docs/ct.html"
+	shell:
+		"cd docs; Rscript -e 'rmarkdown::render(\"ct.rmd\", output_format=\"all\")'"
+
+rule lfd:
+	input: "docs/lfd.Rmd"
+	output: "data/lfd_fit.rdata", "docs/lfd.html"
+	shell:
+		"cd docs; Rscript -e 'rmarkdown::render(\"lfd.Rmd\", output_format=\"all\")'"
+
 rule sim:
-	input: "data/circles.rdata", "scripts/functions.r", "scripts/sim.r"
+	input: "data/circles.rdata", "scripts/functions.r", "scripts/sim.r", "data/lfd_fit.rdata", "data/efficiency_params.rdata"
 	output: "results/sim.rdata"
 	shell:
 		"cd scripts; Rscript sim.r"
