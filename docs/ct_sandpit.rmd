@@ -1,0 +1,237 @@
+---
+title: Experimenting with Ct values
+---
+
+
+
+```{r}
+library(tidyverse)
+tpr1 <- 0.983
+tpr10 <- 0.8
+est_rct <- function(r0, ctmax, E)
+{
+	r0 * (1 + E)^ctmax
+}
+
+est_r0 <- function(ct, E, rct)
+{
+	rct / (1+E)^ct
+}
+
+est_ct <- function(r0, E, rct)
+{
+	log(rct/r0) / log(1+E)
+}
+```
+
+If Ct has some distribution, what distribution must E have such that 10x dilution drops sensitivity from 0.983 to 0.8?
+
+```{r}
+ct_fun <- function(n, ct_alpha, ct_beta, max_ct, min_ct)
+{
+	rbeta(n, ct_alpha, ct_beta) * (max_ct - min_ct) + min_ct
+}
+
+get_E <- function(uci, lci, perc=0.99)
+{
+	mu <- mean(c(uci, lci))
+	s <- (mu - lci) / qnorm(perc)
+	print(mu)
+	print(s)
+	rnorm(100000, mu, s)
+}
+
+n <- 100000
+rct <- 10
+ctthresh <- 35
+e_max <- 0.9
+e_min <- 0.4
+e_alpha <- 2
+e_beta <- 4
+sensitivity_1 <- 0.983
+max_ct <- 42
+min_ct <- 12
+o <- optim(par = c(3,4), fn = function(param, min_ct, max_ct, sensitivity, n, ctthresh)
+{
+	ct <- ct_fun(n, param[1], param[2], max_ct, min_ct)
+	(sum(ct > ctthresh)/n - sensitivity)^2
+}, min_ct=min_ct, max_ct=max_ct, sensitivity=1-sensitivity_1, n=n, ctthresh=ctthresh)
+ctd <- ct_fun(n, o$par[1], o$par[2], ct_max, ct_min)
+Ed <- rbeta(n, e_alpha, e_beta) * (e_max-e_min) + e_min
+r0 <- est_r0(ctd, Ed, rct)
+r0_10 <- r0 / 10
+ctd_10 <- est_ct(r0_10, Ed, rct)
+sum(ctd_10 < ctthresh) / n
+par(mfrow=c(2,2))
+hist(ctd)
+hist(ctd_10)
+hist(Ed)
+hist(r0)
+```
+
+Problem - E needs to be too low. Try making E and Ct correlated
+
+```{r}
+library(mvtnorm)
+
+get_ct <- function(n, uci, lci, perc=0.99)
+{
+	mu <- mean(c(uci, lci))
+	s <- (mu - lci) / qnorm(perc)
+	rnorm(100000, mu, s) %>% pmax(., 1)
+}
+
+get_E <- function(n, uci, lci, perc=0.99)
+{
+	mu <- mean(c(uci, lci))
+	s <- (mu - lci) / qnorm(perc)
+	rnorm(100000, mu, s) %>% pmax(., 0) %>% pmin(., 1)
+}
+
+n <- 100000
+rct <- 10
+ctthresh <- 35
+e_max <- 0.9
+e_min <- 0.4
+e_alpha <- 2
+e_beta <- 4
+sensitivity_1 <- 0.983
+max_ct <- 42
+min_ct <- 12
+o <- optim(par = c(42,12), fn = function(param, sensitivity, n, ctthresh)
+{
+	ct <- get_ct(n, param[1], param[2])
+	(sum(ct > ctthresh)/n - sensitivity)^2
+}, sensitivity=1-sensitivity_1, n=n, ctthresh=ctthresh)
+o
+ctd <- get_ct(n, o$par[1], o$par[2])
+Ed <- get_E(n, 0.9, 0.65)
+init <- rmvnorm(n, c(mean(Ed), mean(ctd)), sigma=matrix(c(var(Ed), -0.05, -0.05, var(ctd)), 2, 2))
+Ed <- init[,1] %>% pmax(., 0) %>% pmin(., 1)
+ctd <- init[,2] %>% pmax(., 1)
+r0 <- est_r0(ctd, Ed, rct)
+r0_10 <- r0 / 2
+ctd_10 <- est_ct(r0_10, Ed, rct)
+cor(init)^2
+sum(ctd < ctthresh) / n
+sum(ctd_10 < ctthresh) / n
+par(mfrow=c(2,2))
+hist(ctd)
+hist(Ed)
+hist(ctd_10)
+hist(r0, breaks=100)
+
+plot(ctd, Ed)
+
+```
+
+This doesn't solve it. Try making Ct flatter - that way small change in viral loads will push more of the distribution over Ct threshold of 35
+
+```{r}
+get_ct <- function(n, uci, lci, ct_alpha=1.1, ct_beta=1.1)
+{
+	rbeta(n, ct_alpha, ct_beta) * (uci-lci) + lci
+}
+
+get_E <- function(n, uci, lci, perc=0.99)
+{
+	mu <- mean(c(uci, lci))
+	s <- (mu - lci) / qnorm(perc)
+	rnorm(100000, mu, s) %>% pmax(., 0) %>% pmin(., 1)
+}
+
+n <- 100000
+rct <- 10
+ctthresh <- 35
+e_max <- 0.9
+e_min <- 0.65
+e_alpha <- 2
+e_beta <- 4
+sensitivity_1 <- 0.983
+
+o <- optim(par = c(42,12), fn = function(param, sensitivity, n, ctthresh)
+{
+	ct <- get_ct(n, param[1], param[2])
+	(sum(ct > ctthresh)/n - sensitivity)^2
+}, sensitivity=1-sensitivity_1, n=n, ctthresh=ctthresh)
+o
+ctd <- get_ct(n, o$par[1], o$par[2])
+Ed <- get_E(n, e_max, e_min)
+r0 <- est_r0(ctd, Ed, rct)
+r0_10 <- r0 / 10
+ctd_10 <- est_ct(r0_10, Ed, rct)
+cor(init)^2
+sum(ctd < ctthresh) / n
+sum(ctd_10 < ctthresh) / n
+par(mfrow=c(2,2))
+hist(ctd)
+hist(Ed)
+hist(ctd_10)
+hist(r0, breaks=100)
+```
+
+That is much better. Now optimise to identify parameters of Ct and E distributions
+
+```{r}
+set.seed(12345)
+n <- 500000
+rct <- 10
+ctthresh <- 35
+e_max <- 0.9
+e_min <- 0.65
+e_alpha <- 2
+e_beta <- 4
+sensitivity_1 <- 0.983
+tpr1 <- 0.983
+tpr10 <- 0.8
+
+fn <- function(param, n, rct, e_max, e_min, ctthresh, tpr1=tpr1, tpr10=tpr10)
+{
+	ctd <- get_ct(n, param[1], param[2], param[3], param[4])
+	Ed <- rbeta(n, param[5], param[6]) * (e_max-e_min) + e_min
+	r0 <- est_r0(ctd, Ed, rct)
+	r0_10 <- r0 / 10
+	ctd_10 <- est_ct(r0_10, Ed, rct)
+	s1 <- sum(ctd < ctthresh)/n
+	s10 <- sum(ctd_10 < ctthresh)/n
+	return((s1 - tpr1)^2 + (s10 - tpr10)^2)
+}
+
+(efficiency_params <- optim(par = c(35, 15, 1.1, 1.1, 1, 1), fn=fn, n=n, rct=rct, e_max=e_max, e_min=e_min, ctthresh=ctthresh, tpr1=tpr1, tpr10=tpr10, control=list(maxit=1000)))
+
+ctd <- get_ct(n, efficiency_params$par[1], efficiency_params$par[2], efficiency_params$par[3], efficiency_params$par[4])
+Ed <- rbeta(n, efficiency_params$par[5], efficiency_params$par[6]) * (e_max-e_min) + e_min
+r0 <- est_r0(ctd, Ed, rct)
+r0_10 <- r0 / 10
+ctd_10 <- est_ct(r0_10, Ed, rct)
+s1 <- sum(ctd < ctthresh)/n
+s10 <- sum(ctd_10 < ctthresh)/n
+
+sum(ctd < ctthresh) / n
+sum(ctd_10 < ctthresh) / n
+
+par(mfrow=c(2,2))
+hist(ctd)
+hist(Ed)
+hist(ctd_10)
+hist(r0, breaks=100)
+```
+
+Change in sensitivity over dilutions
+
+
+```{r}
+dat <- tibble(
+	D=seq(1,100), 
+	sensitivity=sapply(D, function(x) 
+	{
+		r0_x <- r0 / x
+		ctd_x <- est_ct(r0_x, Ed, rct)
+		sum(ctd_x < ctthresh)/n
+	})
+)
+plot(sensitivity ~ D, dat)
+
+
+```
+
