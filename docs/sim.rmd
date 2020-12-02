@@ -11,8 +11,7 @@ suppressPackageStartupMessages(suppressWarnings({
 	library(knitr)
 }))
 
-
-knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=FALSE)
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=FALSE, fig.width=10, fig.height=7)
 ```
 
 ## Background
@@ -208,13 +207,25 @@ ress <- res %>%
 		ppv.ind_tests = assay_ppv(sensitivity.ind_tests, true_prevalence, specificity.ind_tests),
 		ppv.pool_tests = assay_ppv(sensitivity.pool_tests, true_prevalence, specificity.pool_tests),
 		ppv.poolfollowup_tests = assay_ppv(sensitivity.poolfollowup_tests, true_prevalence, specificity.poolfollowup_tests),
+		efficiency2.ind_tests = mean(ppv.ind_tests / cost.ind_tests),
+		efficiency2.pool_tests = mean(ppv.pool_tests / cost.pool_tests),
+		efficiency2.poolfollowup_tests = mean(ppv.poolfollowup_tests / cost.poolfollowup_tests),
 		sensitivity.ind_lfd = 0.76,
+		sensitivity.ind_lfd2 = 1-(1-0.76)^2,
 		specificity.ind_lfd = 0.9965,
+		specificity.ind_lfd2 = 0.9965^2,
 		reagentuse.ind_lfd = 0,
+		reagentuse.ind_lfd2 = 0,
 		ppv.ind_lfd = assay_ppv(sensitivity.ind_lfd, true_prevalence, specificity.ind_lfd),
+		ppv.ind_lfd2 = assay_ppv(sensitivity.ind_lfd2, true_prevalence, specificity.ind_lfd2),
 		cost.ind_lfd = reagentuse.ind_tests * 5,
+		cost.ind_lfd2 = reagentuse.ind_tests * 10,
 		prevalence.ind_lfd = sensitivity.ind_lfd * true_prevalence + (1-specificity.ind_lfd),
-		efficiency.ind_lfd = mean(sensitivity.ind_tests / cost.ind_tests)
+		prevalence.ind_lfd2 = sensitivity.ind_lfd2 * true_prevalence + (1-specificity.ind_lfd2),
+		efficiency.ind_lfd = mean(sensitivity.ind_lfd / cost.ind_lfd),
+		efficiency.ind_lfd2 = mean(sensitivity.ind_lfd2 / cost.ind_lfd2),
+		efficiency2.ind_lfd = mean(ppv.ind_lfd / cost.ind_lfd),
+		efficiency2.ind_lfd2 = mean(ppv.ind_lfd2 / cost.ind_lfd2)
 	)
 ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
 
@@ -224,22 +235,33 @@ temp <- group_by(ress, prevalence, spread, containment) %>%
 		random_pooling=FALSE,
 		cost.ind_tests = mean(cost.ind_tests, na.rm=TRUE),
 		cost.ind_lfd = mean(cost.ind_lfd, na.rm=TRUE),
+		cost.ind_lfd2 = mean(cost.ind_lfd2, na.rm=TRUE),
 		reagentuse.ind_tests = mean(reagentuse.ind_tests, na.rm=TRUE),
 		reagentuse.ind_lfd = mean(reagentuse.ind_lfd, na.rm=TRUE),
+		reagentuse.ind_lfd2 = mean(reagentuse.ind_lfd2, na.rm=TRUE),
 		sensitivity.ind_tests = mean(sensitivity.ind_tests, na.rm=TRUE),
 		sensitivity.ind_lfd = mean(sensitivity.ind_lfd, na.rm=TRUE),
+		sensitivity.ind_lfd2 = mean(sensitivity.ind_lfd2, na.rm=TRUE),
 		specificity.ind_tests = mean(specificity.ind_tests, na.rm=TRUE),
 		specificity.ind_lfd = mean(specificity.ind_lfd, na.rm=TRUE),
+		specificity.ind_lfd2 = mean(specificity.ind_lfd2, na.rm=TRUE),
 		prevalence.ind_tests = mean(prevalence.ind_tests, na.rm=TRUE),
 		prevalence.ind_lfd = mean(prevalence.ind_lfd, na.rm=TRUE),
+		prevalence.ind_lfd2 = mean(prevalence.ind_lfd2, na.rm=TRUE),
 		efficiency.ind_tests = mean(efficiency.ind_tests, na.rm=TRUE),
 		efficiency.ind_lfd = mean(efficiency.ind_lfd, na.rm=TRUE),
+		efficiency.ind_lfd2 = mean(efficiency.ind_lfd2, na.rm=TRUE),
+		efficiency2.ind_tests = mean(efficiency2.ind_tests, na.rm=TRUE),
+		efficiency2.ind_lfd = mean(efficiency2.ind_lfd, na.rm=TRUE),
+		efficiency2.ind_lfd2 = mean(efficiency2.ind_lfd2, na.rm=TRUE),
 		ppv.ind_tests = mean(ppv.ind_tests, na.rm=TRUE),
 		ppv.ind_lfd = mean(ppv.ind_lfd, na.rm=TRUE),
-		ppv.ind_tests=mean(ppv.ind_tests),
+		ppv.ind_lfd2 = mean(ppv.ind_lfd2, na.rm=TRUE),
 		true_prevalence = mean(true_prevalence, na.rm=TRUE)
 	)
 ress2 <- rbind(ress, temp)
+ress2$pooling_type <- "Clustered"
+ress2$pooling_type[ress2$random_pooling] <- "Random"
 
 rename_labels <- function(x)
 {
@@ -249,6 +271,7 @@ rename_labels <- function(x)
 		y <- y[2]
 		y[y=="ind_tests"] <- "Individual PCR"
 		y[y=="ind_lfd"] <- "Individual LFD"
+		y[y=="ind_lfd2"] <- "Individual LFD x2"
 		y[y=="pool_tests"] <- "Pooled PCR"
 		y[y=="poolfollowup_tests"] <- "Pooled PCR + followup"
 		y
@@ -259,17 +282,25 @@ rename_labels <- function(x)
 What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, cost.ind_lfd, cost.ind_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests, cost.ind_tests, cost.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, cost.ind_lfd, cost.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests, cost.ind_tests, cost.ind_lfd, cost.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=cost, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=cost)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=cost, linetype=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
-labs(x="Pool size")
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="")
 ```
 
 Another visualisation of the same thing, showing that impact of clustering isn't very high
@@ -290,66 +321,86 @@ labs(x="Cost of pooled PCR", y="Cost of pooled PCR with followup")
 Followup tests are relatively more expensive when the spread is higher and the prevalence is higher. Similar for reagent use:
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(reagentuse.ind_tests, reagentuse.ind_lfd, reagentuse.pool_tests, reagentuse.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(reagentuse.ind_tests, reagentuse.pool_tests, reagentuse.poolfollowup_tests, reagentuse.ind_lfd, reagentuse.ind_tests, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests, reagentuse.ind_tests, reagentuse.ind_lfd) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=reagentuse, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[tt$key == "Individual PCR (Clustered)"] <- "Individual PCR"
+tt$key[tt$key == "Individual LFD (Clustered)"] <- "Individual LFD"
+tt2 <- subset(tt, pool_size == 2)
+tt2$pool_size <- 1
+tt2$reagentuse <- subset(tt, key == "Individual PCR")$reagentuse[1]
+tt <- rbind(subset(tt, pool_size != 1), tt2)
+
+ggplot(tt, aes(x=pool_size, y=reagentuse)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
-labs(x="Pool size")
+scale_x_continuous(breaks=unique(tt$pool_size)) +
+labs(x="Pool size", linetype="", colour="", y="Number of RT-qPCR tests")
+```
+
+Example
+
+```{r}
+x <- filter(tt, containment == "high", pool_size==20, prevalence == "prv = 0.05", spread == "R = 3")
+x$reagentuse[3]/x$reagentuse[4]
 ```
 
 
 Sensitivity of pool vs pool+followup is basically the same, but both drop sharply with larger pool size given current dilution curves (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_lfd, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_tests, sensitivity.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_lfd, sensitivity.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_tests, sensitivity.ind_lfd, sensitivity.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=sensitivity, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=sensitivity)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=sensitivity, linetype=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
-labs(x="Pool size")
-```
-
-How sensitive is this to assumptions of impact of dilution on sensitivity (R0 (cols) vs baseline prevalence (rows))
-
-```{r}
-ress %>% subset(., containment == "high") %>%
-dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, group, containment, pool_size, prevalence, random_pooling) %>%
-# tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests) %>%
-ggplot(., aes(x=as.factor(pool_size), y=sensitivity.poolfollowup_tests, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=as.factor(random_pooling))) +
-geom_hline(aes(yintercept=sensitivity.ind_tests)) +
-facet_grid(prevalence ~ spread) +
-scale_fill_brewer() +
-theme_bw() +
-labs(x="Pool size", y="Sensitivity of pooled PCR with followup", fill="Random pooling")
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="")
 ```
 
 Specificity
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(specificity.ind_tests, specificity.ind_lfd, specificity.pool_tests, specificity.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="specificity", specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_tests, specificity.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(specificity.ind_tests, specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_lfd, specificity.ind_tests, specificity.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="specificity", specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_tests, specificity.ind_lfd, specificity.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=1-specificity, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=1-specificity)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=1-specificity, linetype=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
-theme_bw() +
+# theme_bw() +
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
 scale_y_log10() +
-labs(x="Pool size", y="False positive rate (log scale, lower is better)")
+labs(x="Pool size", linetype="", colour="", y="False positive rate (log10 scale)")
 ```
 
 
@@ -361,57 +412,120 @@ geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Specificity", colour="R", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Specificity of pool tests", colour="R", shape="Random pooling", linetype="Random pooling")
+
+ggplot(ress, aes(y=specificity.poolfollowup_tests, x=pool_size, group=group)) +
+geom_point(aes(colour=containment, shape=random_pooling)) +
+geom_line(aes(colour=containment, linetype=random_pooling)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+labs(x="Pool size", y="Specificity of pool+followup tests", colour="R", shape="Random pooling", linetype="Random pooling")
+```
+
+```{r}
+ggplot(ress, aes(y=sensitivity.pool_tests, x=pool_size, group=group)) +
+geom_point(aes(colour=containment, shape=random_pooling)) +
+geom_line(aes(colour=containment, linetype=random_pooling)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+labs(x="Pool size", y="Sensitivity of pool tests", colour="R", shape="Random pooling", linetype="Random pooling")
+
+ggplot(ress, aes(y=sensitivity.poolfollowup_tests, x=pool_size, group=group)) +
+geom_point(aes(colour=containment, shape=random_pooling)) +
+geom_line(aes(colour=containment, linetype=random_pooling)) +
+facet_grid(prevalence ~ spread) +
+scale_colour_brewer() +
+labs(x="Pool size", y="Sensitivity of pool+followup", colour="R", shape="Random pooling", linetype="Random pooling")
+
 ```
 
 Positive predictive value
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(ppv.ind_tests, ppv.ind_lfd, ppv.pool_tests, ppv.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="ppv", ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_tests, ppv.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(ppv.ind_tests, ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_lfd, ppv.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="ppv", ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_tests, ppv.ind_lfd, ppv.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=ppv, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=ppv)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=ppv, linetype=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
-labs(x="Pool size")
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="", y="Positive predictive value")
 ```
 
 Estimating prevalence
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(prevalence.ind_tests, prevalence.ind_lfd, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, prevalence, spread, true_prevalence) %>%
-tidyr::gather(key="key", value="est_prevalence", prevalence.pool_tests, prevalence.poolfollowup_tests, prevalence.ind_tests, prevalence.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(prevalence.ind_tests, prevalence.ind_lfd, prevalence.ind_lfd2, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, pooling_type, prevalence, spread, true_prevalence) %>%
+tidyr::gather(key="key", value="est_prevalence", prevalence.pool_tests, prevalence.poolfollowup_tests, prevalence.ind_tests, prevalence.ind_lfd, prevalence.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
 subset(., pool_size %in% c(1,2,5,10,20,30)) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=true_prevalence, y=est_prevalence, group=pool_size)) +
-geom_line(aes(colour=as.factor(pool_size))) +
-facet_wrap(~ key + prevalence, ncol=3, scale="free") +
+mutate(key=paste0(rename_labels(key), " (", pooling_type, ")"))
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(tt, aes(x=true_prevalence, y=est_prevalence)) +
+geom_line(aes(colour=as.factor(pool_size), linetype=as.factor(prevalence))) +
+geom_point(aes(colour=as.factor(pool_size), shape=as.factor(prevalence))) +
+facet_wrap(~ key, ncol=4, scale="free") +
 geom_abline(slope=1) +
 scale_colour_brewer(type="qual") +
 theme_bw() +
-labs(x="True prevalence", y="Estimated prevalence", colour="Pool size")
+labs(x="True prevalence", y="Estimated prevalence", colour="Pool size", linetype="Initial prevalence", shape="Initial prevalence")
 ```
 
 Efficiency - sensitivity vs cost ratios
 
 ```{r}
-ress2 %>% subset(., !random_pooling & containment == "high") %>%
-dplyr::select(efficiency.ind_tests, efficiency.ind_lfd, efficiency.pool_tests, efficiency.poolfollowup_tests, group, containment, pool_size, prevalence, spread) %>%
-tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_tests, efficiency.ind_lfd) %>%
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(efficiency.ind_tests, efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_lfd, efficiency.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_tests, efficiency.ind_lfd, efficiency.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
-mutate(key=rename_labels(key), spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
-ggplot(., aes(x=as.factor(pool_size), y=efficiency, group=group)) +
-geom_bar(position="dodge2", stat="identity", aes(fill=key)) +
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=efficiency)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=efficiency, linetype=key)) +
 facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
-labs(x="Pool size", y="Sensitivity / cost")
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="", y="Sensitivity / cost")
+
+tt <- ress2 %>% subset(., containment == "high") %>%
+dplyr::select(efficiency2.ind_tests, efficiency2.pool_tests, efficiency2.poolfollowup_tests, efficiency2.ind_lfd, efficiency2.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="efficiency2", efficiency2.pool_tests, efficiency2.poolfollowup_tests, efficiency2.ind_tests, efficiency2.ind_lfd, efficiency2.ind_lfd2) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=efficiency2)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=efficiency2, linetype=key)) +
+facet_grid(prevalence ~ spread) +
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="", y="Positive predictive value / cost")
 ```
 
 

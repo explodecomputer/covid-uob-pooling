@@ -30,8 +30,9 @@ Fit a sigmoid model to this relationship, to be used to infer the probability of
 lfd_fit <- nls(sensitivity ~ SSlogis(ct, Asym, xmid, scal), data = d)
 summary(lfd_fit)
 plot(seq(10, 50, length.out = 100), 
-      predict(lfd_fit, newdata = data.frame(ct = seq(10, 50, length.out = 100))))
-points(d, col="red", pch=10)
+      predict(lfd_fit, newdata = data.frame(ct = seq(10, 50, length.out = 100))),
+      xlab="RT-qPCR Ct value", ylab="LFD sensitivity", type="l")
+points(d, col="red", pch=19)
 ```
 
 This model is:
