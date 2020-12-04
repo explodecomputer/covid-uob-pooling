@@ -282,7 +282,7 @@ rename_labels <- function(x)
 What is the extra cost incurred by following up on positive pools to get infected individuals (R0 (cols) vs baseline prevalence (rows))?
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(cost.ind_tests, cost.pool_tests, cost.poolfollowup_tests, cost.ind_lfd, cost.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="cost", cost.pool_tests, cost.poolfollowup_tests, cost.ind_tests, cost.ind_lfd, cost.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -321,7 +321,7 @@ labs(x="Cost of pooled PCR", y="Cost of pooled PCR with followup")
 Followup tests are relatively more expensive when the spread is higher and the prevalence is higher. Similar for reagent use:
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(reagentuse.ind_tests, reagentuse.pool_tests, reagentuse.poolfollowup_tests, reagentuse.ind_lfd, reagentuse.ind_tests, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="reagentuse", reagentuse.pool_tests, reagentuse.poolfollowup_tests, reagentuse.ind_tests, reagentuse.ind_lfd) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -349,7 +349,7 @@ labs(x="Pool size", linetype="", colour="", y="Number of RT-qPCR tests")
 Example
 
 ```{r}
-x <- filter(tt, containment == "high", pool_size==20, prevalence == "prv = 0.05", spread == "R = 3")
+x <- filter(tt, containment == "conquest", pool_size==20, prevalence == "prv = 0.05", spread == "R = 3")
 x$reagentuse[3]/x$reagentuse[4]
 ```
 
@@ -357,7 +357,7 @@ x$reagentuse[3]/x$reagentuse[4]
 Sensitivity of pool vs pool+followup is basically the same, but both drop sharply with larger pool size given current dilution curves (R0 (cols) vs baseline prevalence (rows)):
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(sensitivity.ind_tests, sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_lfd, sensitivity.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="sensitivity", sensitivity.pool_tests, sensitivity.poolfollowup_tests, sensitivity.ind_tests, sensitivity.ind_lfd, sensitivity.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -381,7 +381,7 @@ labs(x="Pool size", linetype="", colour="")
 Specificity
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(specificity.ind_tests, specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_lfd, specificity.ind_tests, specificity.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="specificity", specificity.pool_tests, specificity.poolfollowup_tests, specificity.ind_tests, specificity.ind_lfd, specificity.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -442,7 +442,7 @@ labs(x="Pool size", y="Sensitivity of pool+followup", colour="R", shape="Random 
 Positive predictive value
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(ppv.ind_tests, ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_lfd, ppv.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="ppv", ppv.pool_tests, ppv.poolfollowup_tests, ppv.ind_tests, ppv.ind_lfd, ppv.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -466,7 +466,7 @@ labs(x="Pool size", linetype="", colour="", y="Positive predictive value")
 Estimating prevalence
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(prevalence.ind_tests, prevalence.ind_lfd, prevalence.ind_lfd2, prevalence.pool_tests, prevalence.poolfollowup_tests, group, containment, pool_size, pooling_type, prevalence, spread, true_prevalence) %>%
 tidyr::gather(key="key", value="est_prevalence", prevalence.pool_tests, prevalence.poolfollowup_tests, prevalence.ind_tests, prevalence.ind_lfd, prevalence.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -487,7 +487,7 @@ labs(x="True prevalence", y="Estimated prevalence", colour="Pool size", linetype
 Efficiency - sensitivity vs cost ratios
 
 ```{r}
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(efficiency.ind_tests, efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_lfd, efficiency.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="efficiency", efficiency.pool_tests, efficiency.poolfollowup_tests, efficiency.ind_tests, efficiency.ind_lfd, efficiency.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
@@ -507,7 +507,7 @@ theme_bw() +
 scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
 labs(x="Pool size", linetype="", colour="", y="Sensitivity / cost")
 
-tt <- ress2 %>% subset(., containment == "high") %>%
+tt <- ress2 %>% subset(., containment == "conquest") %>%
 dplyr::select(efficiency2.ind_tests, efficiency2.pool_tests, efficiency2.poolfollowup_tests, efficiency2.ind_lfd, efficiency2.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
 tidyr::gather(key="key", value="efficiency2", efficiency2.pool_tests, efficiency2.poolfollowup_tests, efficiency2.ind_tests, efficiency2.ind_lfd, efficiency2.ind_lfd2) %>%
 subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%

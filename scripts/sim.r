@@ -7,12 +7,14 @@ source("functions.r")
 load("../data/circles.rdata")
 load("../data/efficiency_params.rdata")
 load("../data/lfd_fit.rdata")
+load("../data/containment.rdata")
+
 
 params <- expand.grid(
 	# infection characteristics
 	prevalence = c(0.001, 0.01, 0.05),
-	spread = c(0.5, 1, 3),
-	containment = c("high", "medium", "low"),
+	spread = c(0.8, 1, 3),
+	containment = c("high", "conquest", "scs1"),
 
 	# pooling characteristic
 	pool_size = c(2, 3, 4, 5, 10, 15, 20, 25, 30),
@@ -43,7 +45,7 @@ params$lfd_cost <- 5
 
 res <- mclapply(1:nrow(params), function(i) {
 	message(i, " of ", nrow(params))
-	run_simulation(ids, params[i,])
+	run_simulation(ids, params[i,], containment)
 }, mc.cores=16) %>% bind_rows()
 
 save(res, file="../results/sim.rdata")

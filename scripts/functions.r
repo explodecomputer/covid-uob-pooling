@@ -199,21 +199,14 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_test, cost_lfd)
 }
 
 
-run_simulation <- function(ids, param)
+run_simulation <- function(ids, param, containment)
 {
 	stopifnot(nrow(param) == 1)
-	if(param$containment == "high")
-	{
-		containment <- c(0.9, 0.09, 0.01)
-	} else if(param$containment == "medium") {
-		containment <- c(0.6, 0.3, 0.1)
-	} else if(param$containment == "low") {
-		containment <- c(0.34, 0.33, 0.33)
-	} else {
-		stop("containment value")
-	}
+	stopifnot(param$containment %in% names(containment))
+	cont <- containment[[param$containment]]
+
 	ids <- simulate_viral_load(ids, param$ct_alpha, param$ct_beta, param$ct_max, param$ct_min, param$e_alpha, param$e_beta, param$e_max, param$e_min, param$rct)
-	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
+	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, cont)
 	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
 	ids <- simulate_testing(ids, param$ctthresh, param$rct, param$pcr_fp, param$lfd_Asym, param$lfd_xmid, param$lfd_scal, param$lfd_fp)
 	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_test, param$lfd_cost)

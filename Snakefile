@@ -13,6 +13,12 @@ rule data:
 	shell:
 		"cd scripts; Rscript data.r"
 
+rule containment:
+	input: "scripts/containment.r"
+	output: "data/containment.rdata"
+	shell:
+		"cd scripts; Rscript containment.r"
+
 rule ppv:
 	input: "docs/ppv.rmd"
 	output: "docs/ppv.html"
@@ -30,7 +36,7 @@ rule lfd:
 		"cd docs; Rscript -e 'rmarkdown::render(\"lfd.Rmd\", output_format=\"all\")'"
 
 rule sim:
-	input: "data/circles.rdata", "scripts/functions.r", "scripts/sim.r", "data/lfd_fit.rdata", "data/efficiency_params.rdata"
+	input: "data/circles.rdata", "scripts/functions.r", "scripts/sim.r", "data/lfd_fit.rdata", "data/efficiency_params.rdata", "data/containment.rdata"
 	output: "results/sim.rdata"
 	shell:
 		"cd scripts; Rscript sim.r"
