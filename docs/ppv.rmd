@@ -1,0 +1,21 @@
+---
+title: Positive predictive value
+---
+
+
+$$
+PPV = \frac{ensitivity \times prevalence}{sensitivity \times prevalence + (1-specificity) \times (1-prevalence)}
+$$
+
+```{r}
+library(tidyverse)
+assay_ppv <- function(sensitivity, prevalence, specificity)
+{
+	sensitivity * prevalence / (sensitivity * prevalence + (1-specificity) * (1-prevalence))
+}
+d <- expand.grid(sensitivity = seq(0, 1, by=0.1), prevalence=seq(0, 1, by=0.01), specificity=0.99)
+
+d$ppv = assay_ppv(d$sensitivity, d$prevalence, d$specificity)
+ggplot(d, aes(x=prevalence, y=ppv, group=as.factor(sensitivity))) +
+	geom_line(aes(colour=sensitivity))
+```

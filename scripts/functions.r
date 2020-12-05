@@ -1,5 +1,18 @@
 library(tidyverse)
 library(BBmisc)
+library(caTools)
+
+simulate_viral_load <- function(ids, ct_alpha, ct_beta, ct_max, ct_min, e_alpha, e_beta, e_max, e_min, rct)
+{
+	n <- nrow(ids)
+	ct <- rbeta(n, ct_alpha, ct_beta) * (ct_max - ct_min) + ct_min
+	e <- rbeta(n, e_alpha, e_beta) * (e_max-e_min) + e_min
+	vl <- rct / (1+e)^ct
+	ids$id_E <- e
+	ids$id_ct <- ct
+	ids$id_vl <- vl
+	return(ids)
+}
 
 simulate_infection <- function(ids, prevalence, spread, containment)
 {
@@ -24,6 +37,11 @@ simulate_infection <- function(ids, prevalence, spread, containment)
 		group_by(location) %>%
 		mutate(location_outbreak = sum(infected >= 2)) %>%
 		ungroup()
+	
+	# remove vl for anyone not infected
+	ids$id_vl[ids$infected==FALSE] <- 0
+	# ids$cvl[ids$infected==FALSE] <- 0
+	
 	return(ids)
 }
 
@@ -87,21 +105,38 @@ assay_sensitivity_sigmoid <- function(dilution)
 	1 / (1 + exp(-dilution/4+4)) * -1 + 1
 }
 
-
-simulate_testing <- function(ids)
+assay_ppv <- function(sensitivity, prevalence, specificity)
 {
+	sensitivity * prevalence / (sensitivity * prevalence + (1-specificity) * (1-prevalence))
+}
+
+lfd_prob <- function(x, asym, xmid, scal)
+{
+	asym / (1 + exp((xmid - x)/scal))
+}
+
+simulate_testing <- function(ids, ctthresh, rct, pcr_fp, lfd_Asym, lfd_xmid, lfd_scal, lfd_fp)
+{
+	ids$id_detected <- ids$id_ct < ctthresh
+	ids$id_detected[!ids$infected] <- rbinom(sum(!ids$infected), 1, pcr_fp)
+	ids$id_lfd_detected <- rbinom(nrow(ids), 1, lfd_prob(ids$id_ct, lfd_Asym, lfd_xmid, lfd_scal))
+	ids$id_lfd_detected[!ids$infected] <- rbinom(sum(!ids$infected), 1, lfd_fp)
+
 	detected_pools <- ids %>% group_by(assay_pool) %>%
 		summarise(
-			ninfected = sum(infected), 
-			sensitivity = assay_sensitivity_sigmoid(n()/ninfected),
-			pool_detected = rbinom(1, 1, sensitivity),
+			pool_ninfected = sum(infected), 
+			pool_infected = pool_ninfected > 0,
+			pool_E = min(id_E),
+			pool_vl = sum(id_vl),
+			pool_Rn = pool_vl / n() * (1 + pool_E)^ctthresh,
+			pool_ct = log(rct / pool_vl) / log((1 + pool_E)),
+			pool_detected = pool_ct < ctthresh,
 			.groups="drop"
 		)
-	baseline_sensitivity <- assay_sensitivity_sigmoid(1)
+	detected_pools$pool_detected[!detected_pools$pool_infected] <- rbinom(sum(!detected_pools$pool_infected), 1, pcr_fp)
 	ids <- inner_join(ids, detected_pools, by="assay_pool")
 	ids <- ids %>% group_by(circle) %>%
 		mutate(circle_detected = any(pool_detected))
-	ids$id_detected <- rbinom(nrow(ids), 1, baseline_sensitivity * ids$infected)
 	ids <- ids %>% 
 		group_by(location) %>%
 		mutate(
@@ -113,7 +148,7 @@ simulate_testing <- function(ids)
 }
 
 
-summarise_simulations <- function(ids, cost_samplingkit, cost_test)
+summarise_simulations <- function(ids, cost_samplingkit, cost_test, cost_lfd)
 {
 	npool <- length(unique(ids$assay_pool))
 	nfollowup <- sum(ids$pool_detected)
@@ -137,18 +172,21 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_test)
 		cost.ind_tests = nrow(ids) * cost_samplingkit + nrow(ids) * cost_test,
 		cost.pool_tests = nrow(ids) * cost_samplingkit + npool * cost_test,
 		cost.poolfollowup_tests = cost.pool_tests + nfollowup * cost_test,
+		cost.lfd = nrow(ids) * cost_lfd,
 
 		reagentuse.ind_tests = nrow(ids),
 		reagentuse.pool_tests = npool,
 		reagentuse.poolfollowup_tests = npool + nfollowup,
 
-		sensitivity.ind_tests = sum(ids$id_detected) / sum(ids$infected),
+		sensitivity.ind_tests = sum(ids$infected & ids$id_detected) / sum(ids$infected),
 		sensitivity.pool_tests = sum(ids$pool_detected * ids$infected) / sum(ids$infected),
 		sensitivity.poolfollowup_tests = sum(ids$pool_detected * ids$infected * ids$id_detected) / sum(ids$infected),
+		sensitivity.lfd = sum(ids$infected & ids$id_lfd_detected) / sum(ids$infected),
 
 		specificity.ind_tests = sum(!ids$id_detected & !ids$infected) / sum(!ids$infected),
 		specificity.pool_tests = sum(!ids$pool_detected & !ids$infected) / sum(!ids$infected),
 		specificity.poolfollowup_tests = 1 - sum(ids$pool_detected & ids$id_detected & !ids$infected) / sum(!ids$infected),
+		specificity.lfd = sum(!ids$id_lfd_detected & !ids$infected) / sum(!ids$infected),
 
 		sensitivity.outbreak.ind_tests = sum(ob$ind_outbreak_detected) / sum(ob$outbreak),
 		sensitivity.outbreak.pool_outbreak_detected = sum(ob$pool_outbreak_detected) / sum(ob$outbreak),
@@ -161,26 +199,16 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_test)
 }
 
 
-run_simulation <- function(ids, param)
+run_simulation <- function(ids, param, containment)
 {
 	stopifnot(nrow(param) == 1)
-	if(param$containment == "high")
-	{
-		containment <- c(0.9, 0.09, 0.01)
-	} else if(param$containment == "medium") {
-		containment <- c(0.6, 0.3, 0.1)
-	} else if(param$containment == "low") {
-		containment <- c(0.34, 0.33, 0.33)
-	} else {
-		stop("containment value")
-	}
+	stopifnot(param$containment %in% names(containment))
+	cont <- containment[[param$containment]]
 
-	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, containment)
+	ids <- simulate_viral_load(ids, param$ct_alpha, param$ct_beta, param$ct_max, param$ct_min, param$e_alpha, param$e_beta, param$e_max, param$e_min, param$rct)
+	ids <- simulate_infection(ids, param$prevalence, spread=param$spread, cont)
 	ids <- allocate_pools(ids, param$pool_size, random=param$random_pooling)
-	ids <- simulate_testing(ids)
-	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_test)
+	ids <- simulate_testing(ids, param$ctthresh, param$rct, param$pcr_fp, param$lfd_Asym, param$lfd_xmid, param$lfd_scal, param$lfd_fp)
+	res <- summarise_simulations(ids, param$cost_samplingkit, param$cost_test, param$lfd_cost)
 	return(bind_cols(param, res))
 }
-
-
-

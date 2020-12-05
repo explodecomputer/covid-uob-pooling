@@ -1,0 +1,50 @@
+---
+title: Lateral Flow Device sensitivity model
+---
+
+To compare the pooling model against lateral flow results, see the following document:
+
+[Preliminary report from the Joint PHE Porton Down & University of Oxford SARS-CoV-2 test development and validation cell](https://www.ox.ac.uk/sites/files/oxford/media_wysiwyg/UK%20evaluation_PHE%20Porton%20Down%20%20University%20of%20Oxford_final.pdf)
+
+Figure 2 provides a relationship between Ct value from PCR tests of known positive samples, and LFD sensitivity. Through visual inspection, can obtain the following approximate points:
+
+
+```{r}
+library(dplyr)
+d <- tribble(
+	~ct, ~sensitivity,
+	18.0, 1,
+	19.0, 0.98,
+	23.0, 0.96,
+	26.5, 0.89,
+	29.5, 0.65,
+	32.5, 0.32,
+	34.5, 0.22,
+)
+plot(d)
+```
+
+Fit a sigmoid model to this relationship, to be used to infer the probability of testing positive in LFD based on modelled Ct value
+
+```{r}
+lfd_fit <- nls(sensitivity ~ SSlogis(ct, Asym, xmid, scal), data = d)
+summary(lfd_fit)
+plot(seq(10, 50, length.out = 100), 
+      predict(lfd_fit, newdata = data.frame(ct = seq(10, 50, length.out = 100))),
+      xlab="RT-qPCR Ct value", ylab="LFD sensitivity", type="l")
+points(d, col="red", pch=19)
+```
+
+This model is:
+
+$$
+sensitivity = Asym / (1 + exp((xmid - ct)/scal))
+$$
+
+Save model fit
+
+```{r}
+lfd_fit <- summary(lfd_fit)
+save(lfd_fit, file="../data/lfd_fit.rdata")
+```
+
