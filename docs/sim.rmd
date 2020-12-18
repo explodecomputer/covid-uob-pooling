@@ -210,6 +210,9 @@ ress <- res %>%
 		efficiency2.ind_tests = mean(ppv.ind_tests / cost.ind_tests),
 		efficiency2.pool_tests = mean(ppv.pool_tests / cost.pool_tests),
 		efficiency2.poolfollowup_tests = mean(ppv.poolfollowup_tests / cost.poolfollowup_tests),
+		efficiency3.ind_tests = mean(cost.ind_tests / ppv.ind_tests),
+		efficiency3.pool_tests = mean(cost.pool_tests / ppv.pool_tests),
+		efficiency3.poolfollowup_tests = mean(cost.poolfollowup_tests / ppv.poolfollowup_tests),
 		sensitivity.ind_lfd = 0.76,
 		sensitivity.ind_lfd2 = 1-(1-0.76)^2,
 		specificity.ind_lfd = 0.9965,
@@ -225,7 +228,9 @@ ress <- res %>%
 		efficiency.ind_lfd = mean(sensitivity.ind_lfd / cost.ind_lfd),
 		efficiency.ind_lfd2 = mean(sensitivity.ind_lfd2 / cost.ind_lfd2),
 		efficiency2.ind_lfd = mean(ppv.ind_lfd / cost.ind_lfd),
-		efficiency2.ind_lfd2 = mean(ppv.ind_lfd2 / cost.ind_lfd2)
+		efficiency2.ind_lfd2 = mean(ppv.ind_lfd2 / cost.ind_lfd2),
+	  efficiency3.ind_lfd = mean(cost.ind_lfd / ppv.ind_lfd),
+		efficiency3.ind_lfd2 = mean(cost.ind_lfd2 / ppv.ind_lfd2)
 	)
 ress$group <- paste(ress$prevalence, ress$spread, ress$containment, ress$random_pooling)
 
@@ -254,6 +259,9 @@ temp <- group_by(ress, prevalence, spread, containment) %>%
 		efficiency2.ind_tests = mean(efficiency2.ind_tests, na.rm=TRUE),
 		efficiency2.ind_lfd = mean(efficiency2.ind_lfd, na.rm=TRUE),
 		efficiency2.ind_lfd2 = mean(efficiency2.ind_lfd2, na.rm=TRUE),
+		efficiency3.ind_tests = mean(efficiency3.ind_tests, na.rm=TRUE),
+		efficiency3.ind_lfd = mean(efficiency3.ind_lfd, na.rm=TRUE),
+		efficiency3.ind_lfd2 = mean(efficiency3.ind_lfd2, na.rm=TRUE),
 		ppv.ind_tests = mean(ppv.ind_tests, na.rm=TRUE),
 		ppv.ind_lfd = mean(ppv.ind_lfd, na.rm=TRUE),
 		ppv.ind_lfd2 = mean(ppv.ind_lfd2, na.rm=TRUE),
@@ -529,6 +537,31 @@ labs(x="Pool size", linetype="", colour="", y="Positive predictive value / cost"
 ```
 
 
+Cost per ppv - not getting horizontal lines here though
+
+```{r}
+tt <- ress2 %>% subset(., containment == "conquest") %>%
+dplyr::select(efficiency3.ind_tests, efficiency3.pool_tests, efficiency3.poolfollowup_tests, efficiency3.ind_lfd, efficiency3.ind_lfd2, group, containment, pool_size, prevalence, spread, pooling_type) %>%
+tidyr::gather(key="key", value="efficiency3", efficiency3.pool_tests, efficiency3.poolfollowup_tests, efficiency3.ind_tests, efficiency3.ind_lfd, efficiency3.ind_lfd2) %>%
+subset(., grepl("pool", key) | grepl("ind", key) & pool_size == 1) %>%
+mutate(
+	key=paste0(rename_labels(key), " (", pooling_type, ")"), 
+	spread=paste("R =", spread), prevalence=paste("prv =", prevalence)) %>%
+arrange(pool_size)
+tt$key[grepl("Individual", tt$key)] <- gsub(" \\(Clustered)", "", tt$key[grepl("Individual", tt$key)])
+
+ggplot(subset(tt, pool_size != 1), aes(x=pool_size, y=efficiency3)) +
+geom_point(aes(colour=key)) +
+geom_line(aes(colour=key)) +
+geom_hline(data=subset(tt, grepl("Indiv", key)), aes(yintercept=efficiency3, linetype=key)) +
+facet_grid(prevalence ~ spread) +
+scale_fill_brewer(type="qual", palette=2) +
+theme_bw() +
+scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
+labs(x="Pool size", linetype="", colour="", y="Cost / positive predictive value")
+
+View(tt)
+```
 ## Need to know
 
 - Actual dilution effect on sensitivity past 10x dilution - need this to validate dilution model
