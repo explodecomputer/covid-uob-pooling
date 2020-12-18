@@ -122,8 +122,8 @@ set.seed(12345)
 n <- 500000
 rct <- 10
 ctthresh <- 35
-e_max <- 0.9
-e_min <- 0.65
+e_max <- 1.4
+e_min <- 0.9
 e_alpha <- 2
 e_beta <- 4
 sensitivity_1 <- 0.983

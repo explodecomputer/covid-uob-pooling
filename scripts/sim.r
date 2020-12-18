@@ -21,8 +21,8 @@ params <- expand.grid(
 	random_pooling = c(TRUE, FALSE),
 
 	# costs
-	cost_samplingkit = 2,
-	cost_test = 25,
+	cost_samplingkit = 3.47,
+	cost_test = 12.46,
 	replicates = c(1:100)
 )
 
@@ -32,8 +32,8 @@ params$ct_alpha <- efficiency_params$par[3] # Beta distribution a parameter for 
 params$ct_beta <- efficiency_params$par[4] # Beta distribution b parameter for ct
 params$e_alpha <- efficiency_params$par[5] # Beta distribution a parameter for efficiency
 params$e_beta <- efficiency_params$par[6] # Beta distribution b parameter for efficiency
-params$e_min <- 0.65 # Minimum PCR efficiency
-params$e_max <- 0.9 # Maximum PCR efficiency
+params$e_min <- 0.9 # Minimum PCR efficiency
+params$e_max <- 1.4 # Maximum PCR efficiency
 params$ctthresh <- 35 # Number cycles for detection
 params$rct <- 10 # Log Rct fluourescence detection value - arbitrary
 params$pcr_fp <- 0.005 # Testing false positive rate (per test)

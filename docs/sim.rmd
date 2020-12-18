@@ -350,7 +350,7 @@ Example
 
 ```{r}
 x <- filter(tt, containment == "conquest", pool_size==20, prevalence == "prv = 0.05", spread == "R = 3")
-x$reagentuse[3]/x$reagentuse[4]
+1-x$reagentuse[3]/x$reagentuse[4]
 ```
 
 
@@ -412,14 +412,14 @@ geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Specificity of pool tests", colour="R", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Specificity of pool tests", colour="Containment", shape="Random pooling", linetype="Random pooling")
 
 ggplot(ress, aes(y=specificity.poolfollowup_tests, x=pool_size, group=group)) +
 geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Specificity of pool+followup tests", colour="R", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Specificity of pool+followup tests", colour="Containment", shape="Random pooling", linetype="Random pooling")
 ```
 
 ```{r}
@@ -428,14 +428,14 @@ geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Sensitivity of pool tests", colour="R", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Sensitivity of pool tests", colour="Containment", shape="Random pooling", linetype="Random pooling")
 
 ggplot(ress, aes(y=sensitivity.poolfollowup_tests, x=pool_size, group=group)) +
 geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Sensitivity of pool+followup", colour="R", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Sensitivity of pool+followup", colour="Containment", shape="Random pooling", linetype="Random pooling")
 
 ```
 
