@@ -537,7 +537,7 @@ labs(x="Pool size", linetype="", colour="", y="Positive predictive value / cost"
 ```
 
 
-Cost per ppv - not getting horizontal lines here though
+Cost per ppv 
 
 ```{r}
 tt <- ress2 %>% subset(., containment == "conquest") %>%
@@ -558,9 +558,7 @@ facet_grid(prevalence ~ spread) +
 scale_fill_brewer(type="qual", palette=2) +
 theme_bw() +
 scale_x_continuous(breaks=subset(tt, pool_size != 1) %>% {unique(.$pool_size)}) +
-labs(x="Pool size", linetype="", colour="", y="Cost / positive predictive value")
-
-View(tt)
+labs(x="Pool size", linetype="", colour="", y="Cost / positive predictive value (lower is better)")
 ```
 ## Need to know
 
