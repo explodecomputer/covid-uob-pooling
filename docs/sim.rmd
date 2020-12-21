@@ -9,9 +9,10 @@ suppressPackageStartupMessages(suppressWarnings({
 	library(tidyr)
 	library(ggplot2)
 	library(knitr)
+	library(cowplot)
 }))
 
-knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=FALSE, fig.width=10, fig.height=7)
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, cache=TRUE, fig.width=10, fig.height=7)
 ```
 
 ## Background
@@ -443,7 +444,8 @@ geom_point(aes(colour=containment, shape=random_pooling)) +
 geom_line(aes(colour=containment, linetype=random_pooling)) +
 facet_grid(prevalence ~ spread) +
 scale_colour_brewer() +
-labs(x="Pool size", y="Sensitivity of pool+followup", colour="Containment", shape="Random pooling", linetype="Random pooling")
+labs(x="Pool size", y="Sensitivity of pool+followup", colour="Containment", shape="Random pooling", linetype="Random pooling") +
+theme_minimal_grid()
 
 ```
 
