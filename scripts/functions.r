@@ -195,7 +195,6 @@ simulate_testing <- function(ids, ctthresh, rct, pcr_fp, lfd_Asym, lfd_xmid, lfd
 
 summarise_simulations <- function(ids, cost_samplingkit, cost_test, cost_lfd)
 {
-	print(head(ids))
 	npool <- length(unique(ids$assay_pool))
 	nfollowup <- sum(ids$pool_detected)
 
@@ -212,8 +211,14 @@ summarise_simulations <- function(ids, cost_samplingkit, cost_test, cost_lfd)
 		nstudents = nrow(ids),
 		true_prevalence = sum(ids$infected) / nrow(ids),
 		prevalence.ind_tests = sum(ids$id_detected) / nstudents,
+		prevalence.ind_tests1 = sum(ids$id_detected1) / nstudents,
+		prevalence.ind_tests2 = sum(ids$id_detected2) / nstudents,
 		prevalence.pool_tests = sum(ids$pool_detected) / nstudents,
+		prevalence.pool_tests1 = sum(ids$pool_detected1) / nstudents,
+		prevalence.pool_tests2 = sum(ids$pool_detected2) / nstudents,
 		prevalence.poolfollowup_tests = sum(ids$pool_detected & ids$id_detected) / nstudents,
+		prevalence.poolfollowup_tests1 = sum(ids$pool_detected1 & ids$id_detected1) / nstudents,
+		prevalence.poolfollowup_tests2 = sum(ids$pool_detected2 & ids$id_detected2) / nstudents,
 
 		cost.ind_tests = nrow(ids) * cost_samplingkit + nrow(ids) * cost_test,
 		cost.pool_tests = nrow(ids) * cost_samplingkit + npool * cost_test,
