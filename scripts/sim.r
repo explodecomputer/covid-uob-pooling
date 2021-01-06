@@ -35,7 +35,7 @@ params$e_beta <- efficiency_params$par[6] # Beta distribution b parameter for ef
 params$e_min <- 0.9 # Minimum PCR efficiency
 params$e_max <- 1.4 # Maximum PCR efficiency
 params$ctthresh <- 35 # Number cycles for detection
-params$rct <- 10 # Log Rct fluourescence detection value - arbitrary
+params$rct <- 100000 # Log Rct fluourescence detection value - arbitrary
 params$pcr_fp <- 0.005 # Testing false positive rate (per test)
 params$lfd_Asym <- lfd_fit$coef[1,1]
 params$lfd_xmid <- lfd_fit$coef[2,1]
@@ -45,7 +45,10 @@ params$lfd_cost <- 5
 
 res <- mclapply(1:nrow(params), function(i) {
 	message(i, " of ", nrow(params))
-	run_simulation(ids, params[i,], containment)
+	x <- run_simulation(ids, params[i,], containment)
 }, mc.cores=16) %>% bind_rows()
 
 save(res, file="../results/sim.rdata")
+
+
+i <- which(params$prevalence==0.05)[1]
