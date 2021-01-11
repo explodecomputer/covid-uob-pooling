@@ -181,12 +181,17 @@ s10 <- sum(cqd_10 < cqthresh)/n
 
 sum(cqd < cqthresh) / n
 sum(cqd_10 < cqthresh) / n
+```
 
-par(mfrow=c(2,2))
-hist(cqd, main="", xlab="PCR Cq values")
+```{r, fig.height=12, fig.width=10}
+tc <- seq(0,21,by=0.001)
+vl <- dgamma(tc, shape=2, scale=2)
+par(mfrow=c(3,2))
+plot(vl ~ tc, xlab="Time (days)", ylab="Viral load (arbitrary units)", yaxt='n')
+hist(cqd, main="", xlab="PCR Cq,max values")
 hist(Ed, main="", xlab="PCR Efficiency")
-hist(cqd_10, main="", xlab="PCR Cq values (10x dilution)")
-hist(r0, breaks=100, main="", xlab="Viral load (arbitrary units)")
+hist(cqd_10, main="", xlab="PCR Cq,max values (10x dilution)")
+hist(r0, breaks=100, main="", xlab="Maximum viral load (arbitrary units)")
 ```
 
 Change in sensitivity over dilutions
